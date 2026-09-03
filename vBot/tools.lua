@@ -32,10 +32,41 @@ macro(1000, "Exchange money", function()
   end
 end)
 
+if #storage.moneyItems > 5 then
+  local trimmed = {}
+  for i = 1, 5 do
+    trimmed[i] = storage.moneyItems[i]
+  end
+  storage.moneyItems = trimmed
+end
+
 local moneyContainer = UI.Container(function(widget, items)
   storage.moneyItems = items
 end, true)
-moneyContainer:setHeight(65)
+
+local setMoneyItems = moneyContainer.setItems
+moneyContainer.setItems = function(self, items)
+  if type(self) == "table" then
+    items = self
+    self = moneyContainer
+  end
+  local limited = {}
+  if type(items) == "table" then
+    for i = 1, math.min(5, #items) do
+      limited[i] = items[i]
+    end
+  end
+  setMoneyItems(self, limited)
+  local panel = self.items
+  if panel then
+    local children = panel:getChildren()
+    for i = #children, 6, -1 do
+      children[i]:destroy()
+    end
+  end
+end
+
+moneyContainer:setHeight(35)
 moneyContainer:setItems(storage.moneyItems)
 
 UI.Separator()
