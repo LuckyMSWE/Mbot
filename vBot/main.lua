@@ -1,38 +1,467 @@
-local version = "0.5"
-local currentVersion
-local available = true
+local VERSION = "4.9"
+local REPO = "LuckyMSWE/Mbot"
+local BRANCH = "main"
+local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
+local API_COMMIT = "https://api.github.com/repos/" .. REPO .. "/commits/" .. BRANCH
+local API_TREE = "https://api.github.com/repos/" .. REPO .. "/git/trees/" .. BRANCH .. "?recursive=1"
+local GITHUB_URL = "https://github.com/" .. REPO
+local CHECK_INTERVAL = 12 * 60 * 60
 
-storage.checkVersion = storage.checkVersion or 0
+local ALLOWED_EXT = {
+  lua = true,
+  otui = true,
+  ui = true,
+  txt = true,
+  json = true
+}
 
--- check max once per 12hours
-if os.time() > storage.checkVersion + (12 * 60 * 60) then
+local SKIP_PREFIXES = {
+  "cavebot_configs/",
+  "targetbot_configs/",
+  "vBot_configs/",
+  "storage/",
+  ".git/"
+}
 
-    storage.checkVersion = os.time()
-    
-    HTTP.get("https://raw.githubusercontent.com/Vithrax/vBot/main/vBot/version.txt", function(data, err)
-        if err then
-          warn("[vBot updater]: Unable to check version:\n" .. err)
-          return
-        end
+storage.mbotUpdater = storage.mbotUpdater or {}
+local updaterState = storage.mbotUpdater
+updaterState.lastCheck = updaterState.lastCheck or 0
 
-        currentVersion = data
-        available = true
-    end)
+local configName = modules.game_bot.contentsPanel.config:getCurrentOption().text
+local botRoot = "/bot/" .. configName
+local busy = false
+local remoteVersion = nil
+local remoteSha = nil
+local updateAvailable = false
+local fileQueue = {}
 
+local function normalizeVersion(value)
+  if not value then
+    return ""
+  end
+  return tostring(value):gsub("%s+", "")
 end
 
-UI.Label("mBot v".. version .." \n LuckyM")
+local function isRemoteNewer(remote, installed)
+  local function parts(value)
+    local parsed = {}
+    for number in tostring(value):gmatch("%d+") do
+      table.insert(parsed, tonumber(number))
+    end
+    return parsed
+  end
 
-schedule(5000, function()
+  local remoteParts = parts(remote)
+  local localParts = parts(installed)
+  local count = math.max(#remoteParts, #localParts)
+  for i = 1, count do
+    local remoteValue = remoteParts[i] or 0
+    local localValue = localParts[i] or 0
+    if remoteValue > localValue then
+      return true
+    end
+    if remoteValue < localValue then
+      return false
+    end
+  end
+  return false
+end
 
-    if not available then return end
-    if currentVersion ~= version then
-        
-        UI.Separator()
-        UI.Label("New vBot is available for download! v"..currentVersion)
-        UI.Button("Go to vBot GitHub Page", function() g_platform.openUrl("https://github.com/Vithrax/vBot") end)
-        UI.Separator()
-        
+local function localVersion()
+  local path = botRoot .. "/vBot/version.txt"
+  if g_resources.fileExists(path) then
+    local ok, contents = pcall(function()
+      return g_resources.readFileContents(path)
+    end)
+    if ok and contents then
+      local parsed = normalizeVersion(contents)
+      if parsed:len() > 0 then
+        return parsed
+      end
+    end
+  end
+  return VERSION
+end
+
+local function extensionOf(path)
+  local ext = path:match("%.([%w]+)$")
+  if not ext then
+    return ""
+  end
+  return ext:lower()
+end
+
+local function startsWith(value, prefix)
+  return value:sub(1, #prefix) == prefix
+end
+
+local function isAllowedPath(path)
+  if type(path) ~= "string" or path:len() == 0 then
+    return false
+  end
+  path = path:gsub("\\", "/")
+  if path:sub(1, 1) == "/" then
+    return false
+  end
+  if path:find("..", 1, true) then
+    return false
+  end
+  for _, prefix in ipairs(SKIP_PREFIXES) do
+    if startsWith(path, prefix) then
+      return false
+    end
+  end
+  if path == "_Loader.lua" then
+    return true
+  end
+  if not (startsWith(path, "vBot/") or startsWith(path, "cavebot/") or startsWith(path, "targetbot/")) then
+    return false
+  end
+  return ALLOWED_EXT[extensionOf(path)] == true
+end
+
+local function looksLikeHtmlError(data)
+  if type(data) ~= "string" or data:len() == 0 then
+    return true
+  end
+  local head = data:sub(1, 200):lower()
+  return head:find("<!doctype", 1, true) or head:find("<html", 1, true)
+end
+
+local function decodeJson(data)
+  if type(data) ~= "string" or data:len() == 0 then
+    return nil
+  end
+  local ok, parsed = pcall(function()
+    return json.decode(data)
+  end)
+  if ok and type(parsed) == "table" then
+    return parsed
+  end
+  return nil
+end
+
+local function ensureDir(absDir)
+  if not absDir or absDir:len() == 0 or g_resources.directoryExists(absDir) then
+    return g_resources.directoryExists(absDir)
+  end
+  local current = ""
+  for _, part in ipairs(absDir:split("/")) do
+    if part and part:len() > 0 then
+      current = current .. "/" .. part
+      if not g_resources.directoryExists(current) then
+        g_resources.makeDir(current)
+      end
+    end
+  end
+  return g_resources.directoryExists(absDir)
+end
+
+local function writeBotFile(relativePath, contents)
+  if not isAllowedPath(relativePath) then
+    return false, "blocked path"
+  end
+  local dest = botRoot .. "/" .. relativePath
+  local dir = dest:match("(.+)/[^/]+$")
+  if dir and not ensureDir(dir) then
+    return false, "could not create " .. dir
+  end
+  local ok, err = pcall(function()
+    g_resources.writeFileContents(dest, contents)
+  end)
+  if not ok then
+    return false, err
+  end
+  return true
+end
+
+local function collectFilesFromTree(data)
+  local parsed = decodeJson(data)
+  if not parsed or type(parsed.tree) ~= "table" then
+    return nil
+  end
+  local files = {}
+  for _, entry in ipairs(parsed.tree) do
+    if entry.type == "blob" and isAllowedPath(entry.path) then
+      table.insert(files, entry.path)
+    end
+  end
+  if #files == 0 then
+    return nil
+  end
+  return files
+end
+
+local function collectFilesFromManifest(data)
+  local parsed = decodeJson(data)
+  if not parsed or type(parsed.files) ~= "table" then
+    return nil
+  end
+  local files = {}
+  for _, path in ipairs(parsed.files) do
+    if isAllowedPath(path) then
+      table.insert(files, path)
+    end
+  end
+  if #files == 0 then
+    return nil
+  end
+  return files
+end
+
+setDefaultTab("Main")
+
+local titleLabel = UI.Label("mBot v" .. localVersion() .. "\nLuckyM")
+local statusLabel = UI.Label("Updater: redo")
+statusLabel:setColor("#dfdfdf")
+local checkButton
+local downloadButton
+local reloadButton
+
+local function setStatus(text, color)
+  statusLabel:setText(text)
+  statusLabel:setColor(color or "#dfdfdf")
+end
+
+local function setBusy(state)
+  busy = state
+  if checkButton then
+    checkButton:setEnabled(not state)
+  end
+  if downloadButton then
+    downloadButton:setEnabled(not state)
+  end
+end
+
+local function markUpdateAvailable(remote, sha)
+  remoteVersion = normalizeVersion(remote)
+  remoteSha = sha
+  updateAvailable = true
+  updaterState.remoteVersion = remoteVersion
+  updaterState.remoteSha = sha
+  local extra = ""
+  if sha and sha:len() >= 7 then
+    extra = " [" .. sha:sub(1, 7) .. "]"
+  end
+  setStatus("Ny version: v" .. remoteVersion .. extra, "#e6b800")
+  if downloadButton then
+    downloadButton:setEnabled(true)
+  end
+end
+
+local function markUpToDate(remote)
+  remoteVersion = normalizeVersion(remote)
+  updateAvailable = false
+  updaterState.remoteVersion = remoteVersion
+  setStatus("Senaste versionen installerad (v" .. localVersion() .. ")", "#98BF64")
+end
+
+local function finishDownload(ok, message)
+  setBusy(false)
+  if ok then
+    updaterState.installedSha = remoteSha or updaterState.remoteSha
+    updaterState.seenSha = updaterState.installedSha
+    updaterState.installedVersion = remoteVersion or updaterState.remoteVersion or localVersion()
+    updateAvailable = false
+    setStatus(message or "Uppdatering klar. Ladda om botten.", "#98BF64")
+    if reloadButton then
+      reloadButton:setEnabled(true)
+    end
+    info("[mBot updater] Update finished. Reload the bot.")
+  else
+    setStatus(message or "Nedladdning misslyckades.", "#d9321f")
+    warn("[mBot updater] " .. (message or "Download failed"))
+  end
+end
+
+local function downloadFile(index, retries)
+  if not busy then
+    return
+  end
+  if index > #fileQueue then
+    finishDownload(true, "Uppdatering klar (" .. #fileQueue .. " filer). Ladda om botten.")
+    return
+  end
+
+  local path = fileQueue[index]
+  setStatus("Laddar ner " .. index .. "/" .. #fileQueue .. ":\n" .. path, "#6cb6ff")
+
+  HTTP.get(RAW_BASE .. path, function(data, err)
+    if not busy then
+      return
+    end
+    if err or looksLikeHtmlError(data) then
+      if retries < 1 then
+        schedule(200, function()
+          downloadFile(index, retries + 1)
+        end)
+        return
+      end
+      finishDownload(false, "Kunde inte ladda ner:\n" .. path)
+      return
     end
 
+    local written, writeErr = writeBotFile(path, data)
+    if not written then
+      finishDownload(false, "Kunde inte spara " .. path .. "\n" .. tostring(writeErr))
+      return
+    end
+
+    schedule(40, function()
+      downloadFile(index + 1, 0)
+    end)
+  end)
+end
+
+local function prioritizeFiles(files)
+  local regular = {}
+  local last = {}
+  for _, path in ipairs(files) do
+    if path == "vBot/version.txt" or path == "vBot/main.lua" then
+      table.insert(last, path)
+    else
+      table.insert(regular, path)
+    end
+  end
+  table.sort(last, function(a, b)
+    if a == "vBot/version.txt" then
+      return false
+    end
+    if b == "vBot/version.txt" then
+      return true
+    end
+    return a < b
+  end)
+  for _, path in ipairs(last) do
+    table.insert(regular, path)
+  end
+  return regular
+end
+
+local function startDownload(files)
+  if type(files) ~= "table" or #files == 0 then
+    finishDownload(false, "Inga filer att ladda ner.")
+    return
+  end
+  fileQueue = prioritizeFiles(files)
+  info("[mBot updater] Downloading " .. #fileQueue .. " files from GitHub")
+  downloadFile(1, 0)
+end
+
+local function requestFileListAndDownload()
+  HTTP.get(RAW_BASE .. "vBot/update_manifest.json", function(manifestData, manifestErr)
+    if not busy then
+      return
+    end
+    local manifestFiles = not manifestErr and collectFilesFromManifest(manifestData) or nil
+    if manifestFiles then
+      startDownload(manifestFiles)
+      return
+    end
+
+    HTTP.get(API_TREE, function(data, err)
+      if not busy then
+        return
+      end
+      local files = not err and collectFilesFromTree(data) or nil
+      if files then
+        startDownload(files)
+        return
+      end
+      finishDownload(false, "Kunde inte hamta fillistan fran GitHub.")
+    end)
+  end)
+end
+
+local function applyVersionResult(remote, sha)
+  updaterState.lastCheck = os.time()
+  updaterState.remoteVersion = normalizeVersion(remote)
+  updaterState.remoteSha = sha
+  if normalizeVersion(remote) == "" then
+    setStatus("Kunde inte lasa remote version.", "#d9321f")
+    return
+  end
+  if isRemoteNewer(remote, localVersion()) then
+    markUpdateAvailable(remote, sha)
+    info("[mBot updater] New version available: v" .. normalizeVersion(remote))
+  elseif sha and updaterState.seenSha and sha ~= updaterState.seenSha then
+    markUpdateAvailable(remote, sha)
+    info("[mBot updater] New commit available on main")
+  else
+    if sha then
+      updaterState.seenSha = sha
+    end
+    markUpToDate(remote)
+  end
+end
+
+local function checkForUpdate(force)
+  if busy then
+    return
+  end
+  if not force and updaterState.lastCheck > 0 and os.time() < updaterState.lastCheck + CHECK_INTERVAL then
+    if updaterState.remoteVersion and isRemoteNewer(updaterState.remoteVersion, localVersion()) then
+      markUpdateAvailable(updaterState.remoteVersion, updaterState.remoteSha)
+    else
+      setStatus("Senaste check OK (v" .. localVersion() .. ")", "#98BF64")
+    end
+    return
+  end
+
+  setStatus("Kollar GitHub efter uppdatering...", "#6cb6ff")
+  HTTP.get(RAW_BASE .. "vBot/version.txt", function(data, err)
+    if err or looksLikeHtmlError(data) then
+      setStatus("Kunde inte kolla version:\n" .. tostring(err or "tomt svar"), "#d9321f")
+      warn("[mBot updater] Unable to check version: " .. tostring(err or "empty response"))
+      return
+    end
+
+    local version = normalizeVersion(data)
+    applyVersionResult(version, nil)
+    HTTP.get(API_COMMIT, function(commitData, commitErr)
+      if commitErr then
+        return
+      end
+      local parsed = decodeJson(commitData)
+      if parsed and type(parsed.sha) == "string" then
+        applyVersionResult(version, parsed.sha)
+      end
+    end)
+  end)
+end
+
+local function downloadUpdate()
+  if busy then
+    return
+  end
+  setBusy(true)
+  setStatus("Hamtar fillista fran GitHub...", "#6cb6ff")
+  requestFileListAndDownload()
+end
+
+checkButton = UI.Button("Kolla efter uppdatering", function()
+  checkForUpdate(true)
+end)
+
+downloadButton = UI.Button("Ladda ner uppdatering", function()
+  downloadUpdate()
+end)
+
+UI.Button("Oppna GitHub", function()
+  g_platform.openUrl(GITHUB_URL)
+end)
+
+reloadButton = UI.Button("Ladda om bot", function()
+  reload()
+end)
+reloadButton:setEnabled(false)
+
+UI.Separator()
+
+if updaterState.remoteVersion and isRemoteNewer(updaterState.remoteVersion, localVersion()) then
+  markUpdateAvailable(updaterState.remoteVersion, updaterState.remoteSha)
+end
+
+schedule(1500, function()
+  checkForUpdate(false)
 end)
