@@ -1,4 +1,4 @@
-local VERSION = "4.13"
+local VERSION = "4.15"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -371,7 +371,6 @@ local function startDownload(files)
     return
   end
   fileQueue = prioritizeFiles(files)
-  info("[mBot updater] Downloading " .. #fileQueue .. " files from GitHub")
   downloadFile(1, 0)
 end
 
@@ -437,7 +436,6 @@ local function applyVersionResult(remote, sha, silent)
   end
   if isRemoteNewer(remote, localVersion()) then
     markUpdateAvailable(remote, sha)
-    info("[mBot updater] New version available: v" .. normalizeVersion(remote))
   else
     if sha then
       updaterState.seenSha = sha
