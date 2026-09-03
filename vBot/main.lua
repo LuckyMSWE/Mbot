@@ -1,4 +1,4 @@
-local VERSION = "4.18"
+local VERSION = "4.19"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -125,6 +125,14 @@ local function rawUrl(path)
   return RAW_BASE .. path .. "?t=" .. os.time()
 end
 
+local function looksLikeHtmlError(data)
+  if type(data) ~= "string" or data:len() == 0 then
+    return true
+  end
+  local head = data:sub(1, 200):lower()
+  return head:find("<!doctype", 1, true) or head:find("<html", 1, true)
+end
+
 local function parseRemoteVersion(data)
   local version = normalizeVersion(data)
   if version:match("^%d+%.%d+") then
@@ -147,14 +155,6 @@ local function httpGet(url, triesLeft, callback)
     end
     callback(data)
   end)
-end
-
-local function looksLikeHtmlError(data)
-  if type(data) ~= "string" or data:len() == 0 then
-    return true
-  end
-  local head = data:sub(1, 200):lower()
-  return head:find("<!doctype", 1, true) or head:find("<html", 1, true)
 end
 
 local function decodeJson(data)
