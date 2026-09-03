@@ -5,7 +5,7 @@ local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .
 local API_COMMIT = "https://api.github.com/repos/" .. REPO .. "/commits/" .. BRANCH
 local API_TREE = "https://api.github.com/repos/" .. REPO .. "/git/trees/" .. BRANCH .. "?recursive=1"
 local GITHUB_URL = "https://github.com/" .. REPO
-local CHECK_INTERVAL = 12 * 60 * 60
+local CHECK_INTERVAL = 30
 
 local ALLOWED_EXT = {
   lua = true,
@@ -214,7 +214,6 @@ setDefaultTab("Main")
 local titleLabel = UI.Label("mBot v" .. localVersion() .. "\nLuckyM")
 local statusLabel = UI.Label("Updater: ready")
 statusLabel:setColor("#dfdfdf")
-local checkButton
 local downloadButton
 local reloadButton
 
@@ -225,9 +224,6 @@ end
 
 local function setBusy(state)
   busy = state
-  if checkButton then
-    checkButton:setEnabled(not state)
-  end
   if downloadButton then
     downloadButton:setEnabled(not state)
   end
@@ -398,20 +394,14 @@ local function applyVersionResult(remote, sha)
   end
 end
 
-local function checkForUpdate(force)
+local function checkForUpdate(silent)
   if busy then
     return
   end
-  if not force and updaterState.lastCheck > 0 and os.time() < updaterState.lastCheck + CHECK_INTERVAL then
-    if updaterState.remoteVersion and isRemoteNewer(updaterState.remoteVersion, localVersion()) then
-      markUpdateAvailable(updaterState.remoteVersion, updaterState.remoteSha)
-    else
-      setStatus("Last check OK (v" .. localVersion() .. ")", "#98BF64")
-    end
-    return
-  end
 
-  setStatus("Checking GitHub for updates...", "#6cb6ff")
+  if not silent then
+    setStatus("Checking GitHub for updates...", "#6cb6ff")
+  end
   HTTP.get(RAW_BASE .. "vBot/version.txt", function(data, err)
     if err or looksLikeHtmlError(data) then
       setStatus("Could not check version:\n" .. tostring(err or "empty response"), "#d9321f")
@@ -440,22 +430,19 @@ local function downloadUpdate()
   local installed = localVersion()
   local remote = normalizeVersion(remoteVersion or updaterState.remoteVersion)
   if remote == "" then
-    setStatus("Check for updates first.", "#e6b800")
-    checkForUpdate(true)
+    setStatus("Waiting for GitHub check...", "#e6b800")
+    checkForUpdate(false)
     return
   end
-  if not isRemoteNewer(remote, installed) then
-    setStatus("GitHub does not have a newer version (local v" .. installed .. ", remote v" .. remote .. "). Download cancelled.", "#e6b800")
+  -- Block only a downgrade. Same version is allowed so a new push on main can be pulled.
+  if isRemoteNewer(installed, remote) then
+    setStatus("GitHub has an older version (local v" .. installed .. ", remote v" .. remote .. "). Download blocked.", "#e6b800")
     return
   end
   setBusy(true)
   setStatus("Fetching file list from GitHub...", "#6cb6ff")
   requestFileListAndDownload()
 end
-
-checkButton = UI.Button("Check for updates", function()
-  checkForUpdate(true)
-end)
 
 downloadButton = UI.Button("Download update", function()
   downloadUpdate()
@@ -476,6 +463,12 @@ if updaterState.remoteVersion and isRemoteNewer(updaterState.remoteVersion, loca
   markUpdateAvailable(updaterState.remoteVersion, updaterState.remoteSha)
 end
 
+local function autoCheck()
+  checkForUpdate(true)
+  schedule(CHECK_INTERVAL * 1000, autoCheck)
+end
+
 schedule(1500, function()
   checkForUpdate(false)
+  schedule(CHECK_INTERVAL * 1000, autoCheck)
 end)
