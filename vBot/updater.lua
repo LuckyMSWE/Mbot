@@ -1,7 +1,7 @@
 -- Frozen update engine. Load before main.lua. Change only when the updater itself is broken.
 MbotUpdater = MbotUpdater or {}
 
-local VERSION = "4.21"
+local VERSION = "4.22"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -9,6 +9,7 @@ local API_COMPARE = "https://api.github.com/repos/" .. REPO .. "/compare/"
 local CHECK_INTERVAL = 60
 local CHECK_RETRIES = 3
 local RETRY_DELAY = 1000
+local STARTUP_RETRY_MS = 2000
 
 local ALLOWED_EXT = {
   lua = true,
@@ -45,8 +46,24 @@ local remoteVersion = nil
 local remoteSha = nil
 local updateAvailable = false
 local autoRecover = false
+local firstSuccess = false
+local started = false
+local loopToken = 0
 local fileQueue = {}
 local listeners = {}
+
+local function playerOnline()
+  local ok, online = pcall(function()
+    return g_game.isOnline()
+  end)
+  if ok and online then
+    return true
+  end
+  if player then
+    return true
+  end
+  return false
+end
 
 local function normalizeVersion(value)
   if not value then
@@ -474,9 +491,21 @@ local function applyVersionResult(remote, silent)
   end
 end
 
+local function nextCheckDelay()
+  if firstSuccess and playerOnline() then
+    return CHECK_INTERVAL * 1000
+  end
+  return STARTUP_RETRY_MS
+end
+
 local function scheduleNextCheck()
-  schedule(CHECK_INTERVAL * 1000, function()
-    checkForUpdate(true)
+  loopToken = loopToken + 1
+  local token = loopToken
+  schedule(nextCheckDelay(), function()
+    if token ~= loopToken then
+      return
+    end
+    checkForUpdate(firstSuccess)
   end)
 end
 
@@ -485,6 +514,11 @@ checkForUpdate = function(silent)
     return
   end
   if busy then
+    scheduleNextCheck()
+    return
+  end
+  if not playerOnline() then
+    firstSuccess = false
     scheduleNextCheck()
     return
   end
@@ -497,7 +531,7 @@ checkForUpdate = function(silent)
   httpGet(rawUrl("vBot/version.txt"), CHECK_RETRIES, function(data)
     checking = false
     if not data then
-      if not updateAvailable then
+      if firstSuccess and not updateAvailable then
         emitStatus("GitHub check failed, next try in " .. CHECK_INTERVAL .. "s", "#d9321f", 5000)
       end
       scheduleNextCheck()
@@ -506,15 +540,29 @@ checkForUpdate = function(silent)
 
     local version = parseRemoteVersion(data)
     if not version then
-      if not updateAvailable then
+      if firstSuccess and not updateAvailable then
         emitStatus("Invalid version.txt from GitHub.", "#d9321f", 5000)
       end
       scheduleNextCheck()
       return
     end
 
+    firstSuccess = true
     applyVersionResult(version, silent)
     scheduleNextCheck()
+  end)
+end
+
+local function hookGameStart()
+  pcall(function()
+    connect(g_game, {
+      onGameStart = function()
+        firstSuccess = false
+        schedule(1000, function()
+          checkForUpdate(false)
+        end)
+      end
+    })
   end)
 end
 
@@ -567,7 +615,17 @@ function MbotUpdater.isAvailable()
   return updateAvailable
 end
 
+function MbotUpdater.start()
+  if not started then
+    started = true
+    hookGameStart()
+  end
+  schedule(500, function()
+    checkForUpdate(false)
+  end)
+end
+
 function MbotUpdater.recover()
   autoRecover = true
-  checkForUpdate(false)
+  MbotUpdater.start()
 end

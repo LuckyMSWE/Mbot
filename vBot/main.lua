@@ -1,4 +1,4 @@
-local VERSION = "4.21"
+local VERSION = "4.22"
 
 setDefaultTab("Main")
 
@@ -54,6 +54,4 @@ syncDownloadButton()
 
 UI.Separator()
 
-schedule(2000, function()
-  MbotUpdater.check(false)
-end)
+MbotUpdater.start()
