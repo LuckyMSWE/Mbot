@@ -1,10 +1,11 @@
-local VERSION = "4.17"
+local VERSION = "4.18"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
-local API_COMMIT = "https://api.github.com/repos/" .. REPO .. "/commits/" .. BRANCH
 local API_COMPARE = "https://api.github.com/repos/" .. REPO .. "/compare/"
-local CHECK_INTERVAL = 30
+local CHECK_INTERVAL = 60
+local CHECK_RETRIES = 3
+local RETRY_DELAY = 1000
 
 local ALLOWED_EXT = {
   lua = true,
@@ -29,6 +30,7 @@ updaterState.lastCheck = updaterState.lastCheck or 0
 local configName = modules.game_bot.contentsPanel.config:getCurrentOption().text
 local botRoot = "/bot/" .. configName
 local busy = false
+local checking = false
 local remoteVersion = nil
 local remoteSha = nil
 local updateAvailable = false
@@ -121,6 +123,30 @@ end
 
 local function rawUrl(path)
   return RAW_BASE .. path .. "?t=" .. os.time()
+end
+
+local function parseRemoteVersion(data)
+  local version = normalizeVersion(data)
+  if version:match("^%d+%.%d+") then
+    return version
+  end
+  return nil
+end
+
+local function httpGet(url, triesLeft, callback)
+  HTTP.get(url, function(data, err)
+    if (err or looksLikeHtmlError(data)) and triesLeft > 1 then
+      schedule(RETRY_DELAY, function()
+        httpGet(url, triesLeft - 1, callback)
+      end)
+      return
+    end
+    if err or looksLikeHtmlError(data) then
+      callback(nil, tostring(err or "empty response"))
+      return
+    end
+    callback(data)
+  end)
 end
 
 local function looksLikeHtmlError(data)
@@ -315,17 +341,11 @@ local function downloadFile(index, retries)
   local path = fileQueue[index]
   setStatus("Downloading " .. index .. "/" .. #fileQueue .. ":\n" .. path, "#6cb6ff")
 
-  HTTP.get(rawUrl(path), function(data, err)
+  httpGet(rawUrl(path), CHECK_RETRIES, function(data, err)
     if not busy then
       return
     end
-    if err or looksLikeHtmlError(data) then
-      if retries < 1 then
-        schedule(200, function()
-          downloadFile(index, retries + 1)
-        end)
-        return
-      end
+    if not data then
       finishDownload(false, "Could not download:\n" .. path)
       return
     end
@@ -377,40 +397,23 @@ local function startDownload(files)
 end
 
 local function requestChangedFiles(callback)
-  local fromSha = updaterState.installedSha
-  local toSha = remoteSha or updaterState.remoteSha
+  httpGet(rawUrl("vBot/update_manifest.json"), CHECK_RETRIES, function(manifestData)
+    local manifestFiles = manifestData and collectFilesFromManifest(manifestData) or nil
+    if manifestFiles then
+      callback(manifestFiles)
+      return
+    end
 
-  local function fallbackManifest()
-    HTTP.get(rawUrl("vBot/update_manifest.json"), function(manifestData, manifestErr)
-      callback(not manifestErr and collectFilesFromManifest(manifestData) or nil)
-    end)
-  end
-
-  if fromSha and toSha and fromSha ~= toSha then
-    HTTP.get(API_COMPARE .. fromSha .. "..." .. toSha, function(data, err)
-      local files = not err and collectChangedFiles(data) or nil
-      if files then
-        callback(files)
-        return
-      end
-      fallbackManifest()
-    end)
-    return
-  end
-
-  if toSha then
-    HTTP.get("https://api.github.com/repos/" .. REPO .. "/commits/" .. toSha, function(data, err)
-      local files = not err and collectChangedFiles(data) or nil
-      if files then
-        callback(files)
-        return
-      end
-      fallbackManifest()
-    end)
-    return
-  end
-
-  fallbackManifest()
+    local fromSha = updaterState.installedSha
+    local toSha = remoteSha or updaterState.remoteSha
+    if fromSha and toSha and fromSha ~= toSha then
+      HTTP.get(API_COMPARE .. fromSha .. "..." .. toSha, function(data, err)
+        callback(not err and collectChangedFiles(data) or nil)
+      end)
+      return
+    end
+    callback(nil)
+  end)
 end
 
 local function requestFileListAndDownload()
@@ -426,52 +429,65 @@ local function requestFileListAndDownload()
   end)
 end
 
-local function applyVersionResult(remote, sha, silent)
+local function applyVersionResult(remote, silent)
   updaterState.lastCheck = os.time()
   updaterState.remoteVersion = normalizeVersion(remote)
-  updaterState.remoteSha = sha
   if normalizeVersion(remote) == "" then
-    if not silent then
+    if not silent and not updateAvailable then
       setStatus("Could not read the remote version.", "#d9321f", 5000)
     end
     return
   end
   if isRemoteNewer(remote, localVersion()) then
-    markUpdateAvailable(remote, sha)
+    markUpdateAvailable(remote, updaterState.remoteSha)
   else
-    if sha then
-      updaterState.seenSha = sha
-    end
     markUpToDate(remote, silent)
   end
 end
 
-local function checkForUpdate(silent)
+local checkForUpdate
+
+local function scheduleNextCheck()
+  schedule(CHECK_INTERVAL * 1000, function()
+    checkForUpdate(true)
+  end)
+end
+
+checkForUpdate = function(silent)
+  if checking then
+    return
+  end
   if busy then
+    scheduleNextCheck()
     return
   end
 
+  checking = true
   if not silent then
     setStatus("Checking GitHub for updates...", "#6cb6ff")
   end
-  HTTP.get(rawUrl("vBot/version.txt"), function(data, err)
-    if err or looksLikeHtmlError(data) then
-      setStatus("Could not check version:\n" .. tostring(err or "empty response"), "#d9321f")
-      warn("[mBot updater] Unable to check version: " .. tostring(err or "empty response"))
+
+  httpGet(rawUrl("vBot/version.txt"), CHECK_RETRIES, function(data, err)
+    checking = false
+    if not data then
+      if not updateAvailable then
+        setStatus("GitHub check failed, next try in " .. CHECK_INTERVAL .. "s", "#d9321f", 5000)
+      end
+      scheduleNextCheck()
       return
     end
 
-    local version = normalizeVersion(data)
-    applyVersionResult(version, nil, silent)
-    HTTP.get(API_COMMIT, function(commitData, commitErr)
-      if commitErr then
-        return
+    local version = parseRemoteVersion(data)
+    if not version then
+      if not updateAvailable then
+        setStatus("Invalid version.txt from GitHub.", "#d9321f", 5000)
       end
-      local parsed = decodeJson(commitData)
-      if parsed and type(parsed.sha) == "string" then
-        applyVersionResult(version, parsed.sha, silent)
-      end
-    end)
+      scheduleNextCheck()
+      return
+    end
+
+    applyVersionResult(version, silent)
+    scheduleNextCheck()
   end)
 end
 
@@ -505,12 +521,6 @@ if updaterState.remoteVersion and isRemoteNewer(updaterState.remoteVersion, loca
   markUpdateAvailable(updaterState.remoteVersion, updaterState.remoteSha)
 end
 
-local function autoCheck()
-  checkForUpdate(true)
-  schedule(CHECK_INTERVAL * 1000, autoCheck)
-end
-
-schedule(1500, function()
+schedule(2000, function()
   checkForUpdate(false)
-  schedule(CHECK_INTERVAL * 1000, autoCheck)
 end)
