@@ -1,0 +1,372 @@
+{
+  "specialDeposit": {
+    "items": [
+
+    ],
+    "height": 380
+  },
+  "cavebotSell": [
+    {
+      "id": 23544,
+      "count": 1
+    },
+    {
+      "id": 3081,
+      "count": 1
+    }
+  ],
+  "caveBotTasker": {
+    "monster": "",
+    "taskName": "",
+    "max": 0,
+    "inProgress": false,
+    "count": 0
+  },
+  "newHealer": {
+    "customPlayers": [
+
+    ],
+    "conditions": {
+      "party": true,
+      "guild": false,
+      "friends": false,
+      "knights": true,
+      "paladins": true,
+      "druids": false,
+      "sorcerers": false
+    },
+    "settings": [
+      {
+        "type": "HealItem",
+        "text": "Mana Item ",
+        "value": 268
+      },
+      {
+        "type": "HealScroll",
+        "text": "Item Range: ",
+        "value": 6
+      },
+      {
+        "type": "HealItem",
+        "text": "Health Item ",
+        "value": 3160
+      },
+      {
+        "type": "HealScroll",
+        "text": "Mas Res Players: ",
+        "value": 2
+      },
+      {
+        "type": "HealScroll",
+        "text": "Heal Friend at: ",
+        "value": 80
+      },
+      {
+        "type": "HealScroll",
+        "text": "Use Gran Sio at: ",
+        "value": 30
+      },
+      {
+        "type": "HealScroll",
+        "text": "Min Player HP%: ",
+        "value": 90
+      },
+      {
+        "type": "HealScroll",
+        "text": "Min Player MP%: ",
+        "value": 30
+      }
+    ],
+    "groups": [
+
+    ],
+    "vocations": [
+
+    ],
+    "enabled": false,
+    "priorities": [
+      {
+        "name": "Custom Spell",
+        "custom": true,
+        "enabled": false
+      },
+      {
+        "name": "Exura Gran Sio",
+        "enabled": true,
+        "strong": true
+      },
+      {
+        "name": "Exura Sio",
+        "normal": true,
+        "enabled": true
+      },
+      {
+        "name": "Exura Gran Mas Res",
+        "enabled": true,
+        "area": true
+      },
+      {
+        "name": "Health Item",
+        "enabled": true,
+        "health": true
+      },
+      {
+        "name": "Mana Item",
+        "enabled": true,
+        "mana": true
+      }
+    ]
+  },
+  "autoTradeMessage": "I'm using OTClientV8!",
+  "playerList": {
+    "enemyList": [
+
+    ],
+    "blackList": [
+
+    ],
+    "outfits": false,
+    "highlight": false,
+    "friendList": [
+
+    ],
+    "groupMembers": true,
+    "marks": false
+  },
+  "autoEquip": [
+    {
+      "item1": 3052,
+      "on": false,
+      "title": "Auto Equip",
+      "item2": 3089,
+      "slot": 9
+    },
+    {
+      "item1": 0,
+      "on": false,
+      "title": "Auto Equip",
+      "item2": 0,
+      "slot": 0
+    }
+  ],
+  "caveBot": {
+    "backStop": false,
+    "backOffline": false,
+    "forceRefill": false,
+    "backTrainers": false
+  },
+  "_configs": {
+    "cavebot_configs": {
+      "enabled": false,
+      "selected": "config_name"
+    },
+    "targetbot_configs": {
+      "enabled": false,
+      "selected": "All"
+    }
+  },
+  "extras": {
+    "oberon": true,
+    "shovel": 9596,
+    "separatePm": false,
+    "lootDelay": 200,
+    "highlightTarget": true,
+    "title": true,
+    "huntRoutes": 50,
+    "talkDelay": 1000,
+    "holdMwall": true,
+    "machete": 9596,
+    "nextBackpack": true,
+    "holdMwHot": "F5",
+    "gotoMaxDistance": 30,
+    "holdWgHot": "F6",
+    "scythe": 9596,
+    "rope": 9596,
+    "looting": 40,
+    "checkPlayer": true,
+    "joinBot": false,
+    "suppliesControl": false,
+    "autoOpenDoors": true,
+    "reachable": false,
+    "reUse": false,
+    "bless": true,
+    "antiKick": true,
+    "stake": false,
+    "timers": true,
+    "useAll": "space",
+    "pathfinding": true,
+    "killUnder": 1,
+    "lootLast": true
+  },
+  "alarms": {
+    "privateMsg": [
+
+    ],
+    "defaultMsg": [
+
+    ],
+    "ignoreFriends": [
+
+    ],
+    "flashClient": [
+
+    ],
+    "playerDetected": [
+
+    ],
+    "damageTaken": [
+
+    ],
+    "lowHealth": {
+      "value": 20
+    },
+    "playerAttack": [
+
+    ],
+    "lowMana": {
+      "value": 20
+    },
+    "creatureDetected": [
+
+    ],
+    "customMessage": {
+      "value": ""
+    },
+    "creatureName": {
+      "value": ""
+    }
+  },
+  "_macros": {
+    "": false
+  },
+  "checkVersion": 1788465148,
+  "EquipperPanel": {
+    "rules": [
+
+    ],
+    "enabled": false,
+    "bosses": [
+
+    ]
+  },
+  "dropper": {
+    "useItems": [
+      {
+        "id": 21203,
+        "count": 1
+      },
+      {
+        "id": 14758,
+        "count": 1
+      }
+    ],
+    "trashItems": [
+      {
+        "id": 283,
+        "count": 1
+      },
+      {
+        "id": 284,
+        "count": 1
+      },
+      {
+        "id": 285,
+        "count": 1
+      }
+    ],
+    "enabled": false,
+    "capItems": [
+      {
+        "id": 21175,
+        "count": 1
+      }
+    ]
+  },
+  "foodItems": [
+    {
+      "id": 3582,
+      "count": 1
+    },
+    {
+      "id": 3577,
+      "count": 1
+    },
+    {
+      "count": 1,
+      "id": 3607
+    },
+    {
+      "count": 1,
+      "id": 3585
+    },
+    {
+      "count": 1,
+      "id": 3592
+    },
+    {
+      "count": 1,
+      "id": 3600
+    },
+    {
+      "count": 1,
+      "id": 3601
+    }
+  ],
+  "moneyItems": [
+    {
+      "id": 3031,
+      "count": 1
+    },
+    {
+      "id": 3035,
+      "count": 1
+    }
+  ],
+  "renameContainers": {
+    "purse": true,
+    "list": [
+      {
+        "items": [
+          3081,
+          3048
+        ],
+        "min": false,
+        "value": "Main Backpack",
+        "enabled": true,
+        "item": 9601
+      },
+      {
+        "items": [
+          3161,
+          3180
+        ],
+        "min": true,
+        "value": "Runes",
+        "enabled": true,
+        "item": 2866
+      },
+      {
+        "items": [
+          3031,
+          3035,
+          3043
+        ],
+        "min": true,
+        "value": "Money",
+        "enabled": true,
+        "item": 2871
+      },
+      {
+        "items": [
+
+        ],
+        "min": true,
+        "value": "Purse",
+        "enabled": true,
+        "item": 23396
+      }
+    ],
+    "enabled": false,
+    "height": 170
+  }
+}
