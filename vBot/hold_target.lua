@@ -10,21 +10,24 @@ onKeyPress(function(keys)
 end)
 
 macro(100, "Hold Target", function()
-    -- if attacking then save it as target, but check pos z in case of marking by mistake on other floor
-    if target() and target():getPosition().z == posz() and not target():isNpc() then
-        targetID = target():getId()
-    elseif not target() then
-        -- there is no saved data, do nothing
-        if not targetID then return end
-
-        -- look for target
+    local current = target()
+    if current then
+        local pos = current:getPosition()
+        if pos and pos.z == posz() and not current:isNpc() then
+            targetID = current:getId()
+        end
+    elseif targetID then
+        local found = false
         for i, spec in ipairs(getSpectators()) do
-            local sameFloor = spec:getPosition().z == posz()
-            local oldTarget = spec:getId() == targetID
-            
-            if sameFloor and oldTarget then
+            local specPos = spec:getPosition()
+            if specPos and specPos.z == posz() and spec:getId() == targetID then
                 attack(spec)
+                found = true
+                break
             end
         end
+        if not found then
+            targetID = nil
+        end
     end
-end) 
+end)

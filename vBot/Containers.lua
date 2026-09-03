@@ -450,8 +450,6 @@ if rootWidget then
             end, true, nil, contListWindow.sortList) 
         contListWindow.sortList:setItems(t)
     end
-    refreshSortList(t)
-
     local refreshContNames = function(tFocus)
         local storageVal = config.list
         if storageVal and #storageVal > 0 then
@@ -535,28 +533,28 @@ end
 onContainerOpen(function(container, previousContainer)
     if not container.window then return end
     local containerWindow = container.window
-    if not previousContainer then
-        containerWindow:setContentHeight(34)
-    end
 
     local storageVal = config.list
     if storageVal and #storageVal > 0 then
         for _, entry in pairs(storageVal) do
-            if entry.enabled and string.find(container:getContainerItem():getId(), entry.item) then
+            if entry.enabled and container:getContainerItem():getId() == entry.item then
                 if entry.min then
+                    if not previousContainer then
+                        containerWindow:setContentHeight(34)
+                    end
                     containerWindow:minimize()
                 end
                 if renameContui.title:isOn() then
                     containerWindow:setText(entry.value)
                 end
                 if entry.openNext then
+                    local time = #storageVal * 250
                     for i, item in ipairs(container:getItems()) do
                         if item:getId() == entry.item then
-                            local time = #storageVal * 250
                             schedule(time, function()
-                                time = time + 250
                                 g_game.open(item)
                             end)
+                            time = time + 250
                         end
                     end
                 end
@@ -568,13 +566,14 @@ end)
 local function nameContainersOnLogin()
     for i, container in ipairs(getContainers()) do
         if renameContui.title:isOn() then
-            if not container.window then return end
-            local containerWindow = container.window
-            local storageVal = config.list
-            if storageVal and #storageVal > 0 then
-                for _, entry in pairs(storageVal) do
-                    if entry.enabled and string.find(container:getContainerItem():getId(), entry.item) then
-                        containerWindow:setText(entry.value)
+            if container.window then
+                local containerWindow = container.window
+                local storageVal = config.list
+                if storageVal and #storageVal > 0 then
+                    for _, entry in pairs(storageVal) do
+                        if entry.enabled and container:getContainerItem():getId() == entry.item then
+                            containerWindow:setText(entry.value)
+                        end
                     end
                 end
             end
@@ -600,7 +599,7 @@ local function properTable(t)
 end
 
 local mainLoop = macro(200, function(macro)
-    if not config.sort and not config.purse then return end
+    if not config.sort and not config.purse and not config.forceOpen and not config.lootBag then return end
 
     local storageVal = config.list
     for _, entry in pairs(storageVal) do
@@ -610,7 +609,7 @@ local mainLoop = macro(200, function(macro)
         if config.sort then
             for _, container in pairs(getContainers()) do
                 local cName = container:getName():lower()
-                if not cName:find("depot") and not cName:find("depot") and not cName:find("quiver") then
+                if not cName:find("depot") and not cName:find("quiver") then
                     local cId = container:getContainerItem():getId()
                     for __, item in ipairs(container:getItems()) do
                         local id = item:getId()

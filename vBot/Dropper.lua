@@ -125,6 +125,18 @@ local function properTable(t)
     return r
 end
 
+local function skipContainer(container)
+    if container.lootContainer then
+        return true
+    end
+    local name = container:getName()
+    if not name then
+        return false
+    end
+    name = name:lower()
+    return name:find("depot", 1, true) or name:find("inbox", 1, true)
+end
+
 macro(200, function()
     if not config.enabled then return end
     local tables = {properTable(config.capItems), properTable(config.useItems), properTable(config.trashItems)}
@@ -132,12 +144,23 @@ macro(200, function()
     local containers = getContainers()
     for i=1,3 do
         for _, container in pairs(containers) do
-            for __, item in ipairs(container:getItems()) do
-                for ___, userItem in ipairs(tables[i]) do
-                    if item:getId() == userItem then
-                        return i == 1 and freecap() < 150 and dropItem(item) or
-                               i == 2 and use(item) or
-                               i == 3 and dropItem(item)
+            if not skipContainer(container) then
+                for __, item in ipairs(container:getItems()) do
+                    for ___, userItem in ipairs(tables[i]) do
+                        if item:getId() == userItem then
+                            if i == 1 then
+                                if freecap() < 150 then
+                                    dropItem(item)
+                                    return
+                                end
+                            elseif i == 2 then
+                                use(item)
+                                return
+                            elseif i == 3 then
+                                dropItem(item)
+                                return
+                            end
+                        end
                     end
                 end
             end
