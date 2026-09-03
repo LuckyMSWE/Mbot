@@ -1,4 +1,4 @@
-local VERSION = "4.10"
+local VERSION = "4.11"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -229,10 +229,23 @@ local statusLabel = UI.Label("Updater: ready")
 statusLabel:setColor("#dfdfdf")
 local downloadButton
 local reloadButton
+local statusToken = 0
 
-local function setStatus(text, color)
+local function setStatus(text, color, clearAfter)
+  statusToken = statusToken + 1
+  local token = statusToken
   statusLabel:setText(text)
   statusLabel:setColor(color or "#dfdfdf")
+  if clearAfter then
+    schedule(clearAfter, function()
+      if token ~= statusToken or busy or updateAvailable then
+        return
+      end
+      statusToken = statusToken + 1
+      statusLabel:setText("Updater: ready")
+      statusLabel:setColor("#dfdfdf")
+    end)
+  end
 end
 
 local function setBusy(state)
@@ -261,11 +274,14 @@ local function markUpdateAvailable(remote, sha)
   end
 end
 
-local function markUpToDate(remote)
+local function markUpToDate(remote, silent)
   remoteVersion = normalizeVersion(remote)
   updateAvailable = false
   updaterState.remoteVersion = remoteVersion
-  setStatus("You have the latest version (v" .. localVersion() .. ")", "#98BF64")
+  if silent then
+    return
+  end
+  setStatus("You have the latest version (v" .. localVersion() .. ")", "#98BF64", 5000)
 end
 
 local function finishDownload(ok, message)
@@ -410,12 +426,14 @@ local function requestFileListAndDownload()
   end)
 end
 
-local function applyVersionResult(remote, sha)
+local function applyVersionResult(remote, sha, silent)
   updaterState.lastCheck = os.time()
   updaterState.remoteVersion = normalizeVersion(remote)
   updaterState.remoteSha = sha
   if normalizeVersion(remote) == "" then
-    setStatus("Could not read the remote version.", "#d9321f")
+    if not silent then
+      setStatus("Could not read the remote version.", "#d9321f", 5000)
+    end
     return
   end
   if isRemoteNewer(remote, localVersion()) then
@@ -425,7 +443,7 @@ local function applyVersionResult(remote, sha)
     if sha then
       updaterState.seenSha = sha
     end
-    markUpToDate(remote)
+    markUpToDate(remote, silent)
   end
 end
 
@@ -445,14 +463,14 @@ local function checkForUpdate(silent)
     end
 
     local version = normalizeVersion(data)
-    applyVersionResult(version, nil)
+    applyVersionResult(version, nil, silent)
     HTTP.get(API_COMMIT, function(commitData, commitErr)
       if commitErr then
         return
       end
       local parsed = decodeJson(commitData)
       if parsed and type(parsed.sha) == "string" then
-        applyVersionResult(version, parsed.sha)
+        applyVersionResult(version, parsed.sha, silent)
       end
     end)
   end)
@@ -470,7 +488,7 @@ local function downloadUpdate()
     return
   end
   if not isRemoteNewer(remote, installed) then
-    setStatus("No new version (local v" .. installed .. ", remote v" .. remote .. "). Bump version.txt to publish an update.", "#e6b800")
+    setStatus("No new version (local v" .. installed .. ", remote v" .. remote .. ")", "#e6b800", 5000)
     return
   end
   setBusy(true)
