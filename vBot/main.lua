@@ -1,4 +1,4 @@
-local VERSION = "4.23"
+local VERSION = "4.24"
 
 setDefaultTab("Main")
 
@@ -11,6 +11,10 @@ if not MbotUpdater then
 end
 
 local titleLabel = UI.Label("mBot v" .. MbotUpdater.localVersion() .. "\nLuckyM")
+if BotCache and BotCache.ok == false then
+  local tamperLabel = UI.Label("mBot files were modified. Download update to restore.")
+  tamperLabel:setColor("#d9321f")
+end
 local statusLabel = UI.Label("Updater: ready")
 statusLabel:setColor("#dfdfdf")
 local downloadButton

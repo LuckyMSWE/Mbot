@@ -16,6 +16,7 @@ end
 -- here you can set manually order of scripts
 -- libraries should be loaded first
 local luaFiles = {
+  "cache",
   "updater", -- bootstrap engine, before everything else
   "main",
   "items",
@@ -52,18 +53,29 @@ local luaFiles = {
 }
 
 local mainLoaded = false
+local trusted = false
 for i, file in ipairs(luaFiles) do
-  if file == "main" then
+  if file == "cache" then
     local ok, err = pcall(function()
       loadScript(file)
     end)
-    if ok then
-      mainLoaded = true
-    else
-      warn("[mBot] main.lua failed to load: " .. tostring(err))
+    trusted = ok and BotCache and BotCache.trusted and BotCache.trusted()
+    if not trusted then
+      warn("[mBot] File check failed. Features disabled.")
     end
-  else
-    loadScript(file)
+  elseif file == "updater" or file == "main" or trusted then
+    if file == "main" then
+      local ok, err = pcall(function()
+        loadScript(file)
+      end)
+      if ok then
+        mainLoaded = true
+      else
+        warn("[mBot] main.lua failed to load: " .. tostring(err))
+      end
+    else
+      loadScript(file)
+    end
   end
 end
 
