@@ -1,10 +1,9 @@
-local VERSION = "4.11"
+local VERSION = "4.12"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
 local API_COMMIT = "https://api.github.com/repos/" .. REPO .. "/commits/" .. BRANCH
 local API_COMPARE = "https://api.github.com/repos/" .. REPO .. "/compare/"
-local GITHUB_URL = "https://github.com/" .. REPO
 local CHECK_INTERVAL = 30
 
 local ALLOWED_EXT = {
@@ -498,10 +497,6 @@ end
 
 downloadButton = UI.Button("Download update", function()
   downloadUpdate()
-end)
-
-UI.Button("Open GitHub", function()
-  g_platform.openUrl(GITHUB_URL)
 end)
 
 reloadButton = UI.Button("Reload bot", function()
