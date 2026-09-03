@@ -1,10 +1,24 @@
 {
-  "version": "4.20",
+  "version": "4.21",
   "repo": "LuckyMSWE/Mbot",
   "branch": "main",
   "changed": [
+    "vBot/updater.lua",
+    "_Loader.lua",
     "vBot/main.lua",
     "vBot/version.txt",
     "vBot/update_manifest.json"
+  ],
+  "releases": [
+    {
+      "version": "4.21",
+      "files": [
+        "vBot/updater.lua",
+        "_Loader.lua",
+        "vBot/main.lua",
+        "vBot/version.txt",
+        "vBot/update_manifest.json"
+      ]
+    }
   ]
 }

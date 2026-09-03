@@ -16,6 +16,7 @@ end
 -- here you can set manually order of scripts
 -- libraries should be loaded first
 local luaFiles = {
+  "updater", -- bootstrap engine, before everything else
   "main",
   "items",
   "vlib",
@@ -50,8 +51,24 @@ local luaFiles = {
   "cavebot_control_panel"
 }
 
+local mainLoaded = false
 for i, file in ipairs(luaFiles) do
-  loadScript(file)
+  if file == "main" then
+    local ok, err = pcall(function()
+      loadScript(file)
+    end)
+    if ok then
+      mainLoaded = true
+    else
+      warn("[mBot] main.lua failed to load: " .. tostring(err))
+    end
+  else
+    loadScript(file)
+  end
+end
+
+if not mainLoaded and MbotUpdater and MbotUpdater.recover then
+  MbotUpdater.recover()
 end
 
 setDefaultTab("Main")
