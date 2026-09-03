@@ -1,4 +1,4 @@
-local VERSION = "4.15"
+local VERSION = "4.16"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -117,6 +117,10 @@ local function isAllowedPath(path)
     return false
   end
   return ALLOWED_EXT[extensionOf(path)] == true
+end
+
+local function rawUrl(path)
+  return RAW_BASE .. path .. "?t=" .. os.time()
 end
 
 local function looksLikeHtmlError(data)
@@ -280,7 +284,7 @@ local function markUpToDate(remote, silent)
   if silent then
     return
   end
-  setStatus("You have the latest version (v" .. localVersion() .. ")", "#98BF64", 5000)
+  setStatus("Latest version (local v" .. localVersion() .. ", GitHub v" .. remoteVersion .. ")", "#98BF64", 5000)
 end
 
 local function finishDownload(ok, message)
@@ -313,7 +317,7 @@ local function downloadFile(index, retries)
   local path = fileQueue[index]
   setStatus("Downloading " .. index .. "/" .. #fileQueue .. ":\n" .. path, "#6cb6ff")
 
-  HTTP.get(RAW_BASE .. path, function(data, err)
+  HTTP.get(rawUrl(path), function(data, err)
     if not busy then
       return
     end
@@ -379,7 +383,7 @@ local function requestChangedFiles(callback)
   local toSha = remoteSha or updaterState.remoteSha
 
   local function fallbackManifest()
-    HTTP.get(RAW_BASE .. "vBot/update_manifest.json", function(manifestData, manifestErr)
+    HTTP.get(rawUrl("vBot/update_manifest.json"), function(manifestData, manifestErr)
       callback(not manifestErr and collectFilesFromManifest(manifestData) or nil)
     end)
   end
@@ -452,7 +456,7 @@ local function checkForUpdate(silent)
   if not silent then
     setStatus("Checking GitHub for updates...", "#6cb6ff")
   end
-  HTTP.get(RAW_BASE .. "vBot/version.txt", function(data, err)
+  HTTP.get(rawUrl("vBot/version.txt"), function(data, err)
     if err or looksLikeHtmlError(data) then
       setStatus("Could not check version:\n" .. tostring(err or "empty response"), "#d9321f")
       warn("[mBot updater] Unable to check version: " .. tostring(err or "empty response"))
