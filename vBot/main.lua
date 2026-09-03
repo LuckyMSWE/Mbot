@@ -1,9 +1,9 @@
-local VERSION = "4.9"
+local VERSION = "4.10"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
 local API_COMMIT = "https://api.github.com/repos/" .. REPO .. "/commits/" .. BRANCH
-local API_TREE = "https://api.github.com/repos/" .. REPO .. "/git/trees/" .. BRANCH .. "?recursive=1"
+local API_COMPARE = "https://api.github.com/repos/" .. REPO .. "/compare/"
 local GITHUB_URL = "https://github.com/" .. REPO
 local CHECK_INTERVAL = 30
 
@@ -175,17 +175,30 @@ local function writeBotFile(relativePath, contents)
   return true
 end
 
-local function collectFilesFromTree(data)
+local function addUnique(files, path)
+  if not isAllowedPath(path) then
+    return
+  end
+  for _, existing in ipairs(files) do
+    if existing == path then
+      return
+    end
+  end
+  table.insert(files, path)
+end
+
+local function collectChangedFiles(data)
   local parsed = decodeJson(data)
-  if not parsed or type(parsed.tree) ~= "table" then
+  if not parsed or type(parsed.files) ~= "table" then
     return nil
   end
   local files = {}
-  for _, entry in ipairs(parsed.tree) do
-    if entry.type == "blob" and isAllowedPath(entry.path) then
-      table.insert(files, entry.path)
+  for _, entry in ipairs(parsed.files) do
+    if entry.status ~= "removed" and type(entry.filename) == "string" then
+      addUnique(files, entry.filename)
     end
   end
+  addUnique(files, "vBot/version.txt")
   if #files == 0 then
     return nil
   end
@@ -194,15 +207,15 @@ end
 
 local function collectFilesFromManifest(data)
   local parsed = decodeJson(data)
-  if not parsed or type(parsed.files) ~= "table" then
+  local list = parsed and (parsed.changed or parsed.files)
+  if type(list) ~= "table" then
     return nil
   end
   local files = {}
-  for _, path in ipairs(parsed.files) do
-    if isAllowedPath(path) then
-      table.insert(files, path)
-    end
+  for _, path in ipairs(list) do
+    addUnique(files, path)
   end
+  addUnique(files, "vBot/version.txt")
   if #files == 0 then
     return nil
   end
@@ -347,28 +360,53 @@ local function startDownload(files)
   downloadFile(1, 0)
 end
 
+local function requestChangedFiles(callback)
+  local fromSha = updaterState.installedSha
+  local toSha = remoteSha or updaterState.remoteSha
+
+  local function fallbackManifest()
+    HTTP.get(RAW_BASE .. "vBot/update_manifest.json", function(manifestData, manifestErr)
+      callback(not manifestErr and collectFilesFromManifest(manifestData) or nil)
+    end)
+  end
+
+  if fromSha and toSha and fromSha ~= toSha then
+    HTTP.get(API_COMPARE .. fromSha .. "..." .. toSha, function(data, err)
+      local files = not err and collectChangedFiles(data) or nil
+      if files then
+        callback(files)
+        return
+      end
+      fallbackManifest()
+    end)
+    return
+  end
+
+  if toSha then
+    HTTP.get("https://api.github.com/repos/" .. REPO .. "/commits/" .. toSha, function(data, err)
+      local files = not err and collectChangedFiles(data) or nil
+      if files then
+        callback(files)
+        return
+      end
+      fallbackManifest()
+    end)
+    return
+  end
+
+  fallbackManifest()
+end
+
 local function requestFileListAndDownload()
-  HTTP.get(RAW_BASE .. "vBot/update_manifest.json", function(manifestData, manifestErr)
+  requestChangedFiles(function(files)
     if not busy then
       return
     end
-    local manifestFiles = not manifestErr and collectFilesFromManifest(manifestData) or nil
-    if manifestFiles then
-      startDownload(manifestFiles)
+    if files then
+      startDownload(files)
       return
     end
-
-    HTTP.get(API_TREE, function(data, err)
-      if not busy then
-        return
-      end
-      local files = not err and collectFilesFromTree(data) or nil
-      if files then
-        startDownload(files)
-        return
-      end
-      finishDownload(false, "Could not fetch the file list from GitHub.")
-    end)
+    finishDownload(false, "Could not fetch the changed file list from GitHub.")
   end)
 end
 
@@ -383,9 +421,6 @@ local function applyVersionResult(remote, sha)
   if isRemoteNewer(remote, localVersion()) then
     markUpdateAvailable(remote, sha)
     info("[mBot updater] New version available: v" .. normalizeVersion(remote))
-  elseif sha and updaterState.seenSha and sha ~= updaterState.seenSha then
-    markUpdateAvailable(remote, sha)
-    info("[mBot updater] New commit available on main")
   else
     if sha then
       updaterState.seenSha = sha
@@ -434,13 +469,12 @@ local function downloadUpdate()
     checkForUpdate(false)
     return
   end
-  -- Block only a downgrade. Same version is allowed so a new push on main can be pulled.
-  if isRemoteNewer(installed, remote) then
-    setStatus("GitHub has an older version (local v" .. installed .. ", remote v" .. remote .. "). Download blocked.", "#e6b800")
+  if not isRemoteNewer(remote, installed) then
+    setStatus("No new version (local v" .. installed .. ", remote v" .. remote .. "). Bump version.txt to publish an update.", "#e6b800")
     return
   end
   setBusy(true)
-  setStatus("Fetching file list from GitHub...", "#6cb6ff")
+  setStatus("Fetching changed files from GitHub...", "#6cb6ff")
   requestFileListAndDownload()
 end
 
