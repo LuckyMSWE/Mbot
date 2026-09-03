@@ -1,4 +1,4 @@
-local VERSION = "4.12"
+local VERSION = "4.13"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"

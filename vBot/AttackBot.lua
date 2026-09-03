@@ -1079,6 +1079,7 @@ function getMonstersInArea(category, posOrCreature, pattern, minHp, maxHp, safeP
   if category == 1 or category == 3 or category == 4 then
     if category == 1 or category == 3 then
       local name = getTarget() and getTarget():getName()
+      name = name and name:lower()
       if #t ~= 0 and not table.find(t, name, true) then
         return 0
       end
@@ -1136,9 +1137,12 @@ end
 -- support function covered, now the main loop
 macro(100, function()
   if not currentSettings.enabled then return end
-  if #currentSettings.attackTable == 0 or isInPz() or not target() or modules.game_cooldown.isGroupCooldownIconActive(1) then return end
+  local currentTarget = target()
+  if #currentSettings.attackTable == 0 or isInPz() or not currentTarget or modules.game_cooldown.isGroupCooldownIconActive(1) then return end
+  local targetPos = currentTarget:getPosition()
+  if not targetPos then return end
 
-  if currentSettings.Training and target() and target():getName():lower():find("training") then return end
+  if currentSettings.Training and currentTarget:getName():lower():find("training") then return end
 
   if g_game.getClientVersion() < 960 or not currentSettings.Cooldown then
     delay(400)
@@ -1202,23 +1206,22 @@ macro(100, function()
     if entry.enabled and manapercent() >= entry.mana then
       if (type(attackData) == "string" and canCast(entry.spell, not currentSettings.ignoreMana, not currentSettings.Cooldown)) or (entry.itemId > 100 and (not currentSettings.Visible or findItem(entry.itemId))) then 
         -- first PVP scenario
-        if currentSettings.pvpMode and target():getHealthPercent() >= entry.minHp and target():getHealthPercent() <= entry.maxHp and target():canShoot() then
-          if entry.category == 2 then
-            return warn("[AttackBot] Area Runes cannot be used in PVP situation!")
-          else
+        if currentSettings.pvpMode then
+          if currentTarget:getHealthPercent() >= entry.minHp and currentTarget:getHealthPercent() <= entry.maxHp and currentTarget:canShoot() then
+            if entry.category == 2 then
+              return warn("[AttackBot] Area Runes cannot be used in PVP situation!")
+            end
             return executeAttackBotAction(entry.category, attackData, entry.cooldown)
           end
-        end
-        -- empowerment
-        if entry.category == 4 and not isBuffed() then
+        elseif entry.category == 4 and not isBuffed() then
           local monsterAmount = getMonstersInArea(entry.category, nil, nil, entry.minHp, entry.maxHp, false, entry.monsters)
-          if (entry.orMore and monsterAmount >= entry.count or not entry.orMore and monsterAmount == entry.count) and distanceFromPlayer(target():getPosition()) <= entry.pattern then
+          if (entry.orMore and monsterAmount >= entry.count or not entry.orMore and monsterAmount == entry.count) and distanceFromPlayer(targetPos) <= entry.pattern then
             return executeAttackBotAction(entry.category, attackData, entry.cooldown)
           end
         --
         elseif entry.category == 1 or entry.category == 3 then
           local monsterAmount = getMonstersInArea(entry.category, nil, nil, entry.minHp, entry.maxHp, false, entry.monsters)
-          if (entry.orMore and monsterAmount >= entry.count or not entry.orMore and monsterAmount == entry.count) and distanceFromPlayer(target():getPosition()) <= entry.pattern then
+          if (entry.orMore and monsterAmount >= entry.count or not entry.orMore and monsterAmount == entry.count) and distanceFromPlayer(targetPos) <= entry.pattern then
             return executeAttackBotAction(entry.category, attackData, entry.cooldown)
           end
         elseif entry.category == 5 then

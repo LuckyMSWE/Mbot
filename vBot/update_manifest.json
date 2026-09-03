@@ -1,8 +1,10 @@
 {
-  "version": "4.12",
+  "version": "4.13",
   "repo": "LuckyMSWE/Mbot",
   "branch": "main",
   "changed": [
+    "vBot/new_healer.lua",
+    "vBot/AttackBot.lua",
     "vBot/main.lua",
     "vBot/version.txt",
     "vBot/update_manifest.json"

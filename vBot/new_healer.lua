@@ -125,6 +125,7 @@ customList.addPanel.add.onClick = function()
     for i, word in ipairs(words) do
       name = name .. " " .. capitalFistLetter(word)
     end
+    name = name:trim()
 
     if not health then    
         clearFields()
@@ -386,9 +387,17 @@ local function friendHealerAction(spec, targetsInRange)
                 return say('exura gran sio "'..name)
             end
             
-            -- Fixed: Proper timing increment and distance check for normal heal
-            if (action.normal or action.custom) and health <= normalHeal and now > lastSio and dist <= 7 then -- assuming max spell range is 7
-                lastSio = now + 1000  -- Fixed: was adding to itself instead of setting from now
+            if action.custom and health <= normalHeal and now > lastSio and dist <= 7 then
+                lastSio = now + 1000
+                local formula = action.name or ""
+                if formula:find('"', 1, true) then
+                    return say(formula)
+                end
+                return say(formula .. ' "' .. name)
+            end
+
+            if action.normal and health <= normalHeal and now > lastSio and dist <= 7 then
+                lastSio = now + 1000
                 return say('exura sio "'..name)
             end
         end
@@ -437,7 +446,7 @@ local function isCandidate(spec)
     local okGuild = config.conditions.guild and spec:getEmblem() == 1
     -- local okBotServer = config.conditions.botserver and vBot.BotServerMembers[spec:getName()]
 
-    if not (okParty or okFriend or okGuild) then
+    if not config.customPlayers[name] and not (okParty or okFriend or okGuild) then
         return nil
     end
 
@@ -460,7 +469,7 @@ macro(100, function()
     -- Fixed: Added proper safety check - don't heal others if we're low on resources
     if hppercent() <= minHp or manapercent() <= minMp then return end
     
-    local spectators = getSpectators(posz())
+    local spectators = getSpectators()
 
     for i, spec in ipairs(spectators) do
         local health, dist = isCandidate(spec)
