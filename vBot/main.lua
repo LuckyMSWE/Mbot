@@ -212,7 +212,7 @@ end
 setDefaultTab("Main")
 
 local titleLabel = UI.Label("mBot v" .. localVersion() .. "\nLuckyM")
-local statusLabel = UI.Label("Updater: redo")
+local statusLabel = UI.Label("Updater: ready")
 statusLabel:setColor("#dfdfdf")
 local checkButton
 local downloadButton
@@ -235,15 +235,18 @@ end
 
 local function markUpdateAvailable(remote, sha)
   remoteVersion = normalizeVersion(remote)
+  if remoteVersion == "" then
+    remoteVersion = "?"
+  end
   remoteSha = sha
   updateAvailable = true
   updaterState.remoteVersion = remoteVersion
   updaterState.remoteSha = sha
   local extra = ""
-  if sha and sha:len() >= 7 then
+  if type(sha) == "string" and sha:len() >= 7 then
     extra = " [" .. sha:sub(1, 7) .. "]"
   end
-  setStatus("Ny version: v" .. remoteVersion .. extra, "#e6b800")
+  setStatus("New version available: v" .. remoteVersion .. extra, "#e6b800")
   if downloadButton then
     downloadButton:setEnabled(true)
   end
@@ -253,7 +256,7 @@ local function markUpToDate(remote)
   remoteVersion = normalizeVersion(remote)
   updateAvailable = false
   updaterState.remoteVersion = remoteVersion
-  setStatus("Senaste versionen installerad (v" .. localVersion() .. ")", "#98BF64")
+  setStatus("You have the latest version (v" .. localVersion() .. ")", "#98BF64")
 end
 
 local function finishDownload(ok, message)
@@ -263,13 +266,13 @@ local function finishDownload(ok, message)
     updaterState.seenSha = updaterState.installedSha
     updaterState.installedVersion = remoteVersion or updaterState.remoteVersion or localVersion()
     updateAvailable = false
-    setStatus(message or "Uppdatering klar. Ladda om botten.", "#98BF64")
+    setStatus(message or "Update complete. Reload the bot.", "#98BF64")
     if reloadButton then
       reloadButton:setEnabled(true)
     end
     info("[mBot updater] Update finished. Reload the bot.")
   else
-    setStatus(message or "Nedladdning misslyckades.", "#d9321f")
+    setStatus(message or "Download failed.", "#d9321f")
     warn("[mBot updater] " .. (message or "Download failed"))
   end
 end
@@ -279,12 +282,12 @@ local function downloadFile(index, retries)
     return
   end
   if index > #fileQueue then
-    finishDownload(true, "Uppdatering klar (" .. #fileQueue .. " filer). Ladda om botten.")
+    finishDownload(true, "Update complete (" .. #fileQueue .. " files). Reload the bot.")
     return
   end
 
   local path = fileQueue[index]
-  setStatus("Laddar ner " .. index .. "/" .. #fileQueue .. ":\n" .. path, "#6cb6ff")
+  setStatus("Downloading " .. index .. "/" .. #fileQueue .. ":\n" .. path, "#6cb6ff")
 
   HTTP.get(RAW_BASE .. path, function(data, err)
     if not busy then
@@ -297,13 +300,13 @@ local function downloadFile(index, retries)
         end)
         return
       end
-      finishDownload(false, "Kunde inte ladda ner:\n" .. path)
+      finishDownload(false, "Could not download:\n" .. path)
       return
     end
 
     local written, writeErr = writeBotFile(path, data)
     if not written then
-      finishDownload(false, "Kunde inte spara " .. path .. "\n" .. tostring(writeErr))
+      finishDownload(false, "Could not save " .. path .. "\n" .. tostring(writeErr))
       return
     end
 
@@ -340,7 +343,7 @@ end
 
 local function startDownload(files)
   if type(files) ~= "table" or #files == 0 then
-    finishDownload(false, "Inga filer att ladda ner.")
+    finishDownload(false, "No files to download.")
     return
   end
   fileQueue = prioritizeFiles(files)
@@ -368,7 +371,7 @@ local function requestFileListAndDownload()
         startDownload(files)
         return
       end
-      finishDownload(false, "Kunde inte hamta fillistan fran GitHub.")
+      finishDownload(false, "Could not fetch the file list from GitHub.")
     end)
   end)
 end
@@ -378,7 +381,7 @@ local function applyVersionResult(remote, sha)
   updaterState.remoteVersion = normalizeVersion(remote)
   updaterState.remoteSha = sha
   if normalizeVersion(remote) == "" then
-    setStatus("Kunde inte lasa remote version.", "#d9321f")
+    setStatus("Could not read the remote version.", "#d9321f")
     return
   end
   if isRemoteNewer(remote, localVersion()) then
@@ -403,15 +406,15 @@ local function checkForUpdate(force)
     if updaterState.remoteVersion and isRemoteNewer(updaterState.remoteVersion, localVersion()) then
       markUpdateAvailable(updaterState.remoteVersion, updaterState.remoteSha)
     else
-      setStatus("Senaste check OK (v" .. localVersion() .. ")", "#98BF64")
+      setStatus("Last check OK (v" .. localVersion() .. ")", "#98BF64")
     end
     return
   end
 
-  setStatus("Kollar GitHub efter uppdatering...", "#6cb6ff")
+  setStatus("Checking GitHub for updates...", "#6cb6ff")
   HTTP.get(RAW_BASE .. "vBot/version.txt", function(data, err)
     if err or looksLikeHtmlError(data) then
-      setStatus("Kunde inte kolla version:\n" .. tostring(err or "tomt svar"), "#d9321f")
+      setStatus("Could not check version:\n" .. tostring(err or "empty response"), "#d9321f")
       warn("[mBot updater] Unable to check version: " .. tostring(err or "empty response"))
       return
     end
@@ -434,24 +437,35 @@ local function downloadUpdate()
   if busy then
     return
   end
+  local installed = localVersion()
+  local remote = normalizeVersion(remoteVersion or updaterState.remoteVersion)
+  if remote == "" then
+    setStatus("Check for updates first.", "#e6b800")
+    checkForUpdate(true)
+    return
+  end
+  if not isRemoteNewer(remote, installed) then
+    setStatus("GitHub does not have a newer version (local v" .. installed .. ", remote v" .. remote .. "). Download cancelled.", "#e6b800")
+    return
+  end
   setBusy(true)
-  setStatus("Hamtar fillista fran GitHub...", "#6cb6ff")
+  setStatus("Fetching file list from GitHub...", "#6cb6ff")
   requestFileListAndDownload()
 end
 
-checkButton = UI.Button("Kolla efter uppdatering", function()
+checkButton = UI.Button("Check for updates", function()
   checkForUpdate(true)
 end)
 
-downloadButton = UI.Button("Ladda ner uppdatering", function()
+downloadButton = UI.Button("Download update", function()
   downloadUpdate()
 end)
 
-UI.Button("Oppna GitHub", function()
+UI.Button("Open GitHub", function()
   g_platform.openUrl(GITHUB_URL)
 end)
 
-reloadButton = UI.Button("Ladda om bot", function()
+reloadButton = UI.Button("Reload bot", function()
   reload()
 end)
 reloadButton:setEnabled(false)
