@@ -1,4 +1,4 @@
-local VERSION = "4.16"
+local VERSION = "4.17"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -231,7 +231,6 @@ local titleLabel = UI.Label("mBot v" .. localVersion() .. "\nLuckyM")
 local statusLabel = UI.Label("Updater: ready")
 statusLabel:setColor("#dfdfdf")
 local downloadButton
-local reloadButton
 local statusToken = 0
 
 local function setStatus(text, color, clearAfter)
@@ -294,11 +293,10 @@ local function finishDownload(ok, message)
     updaterState.seenSha = updaterState.installedSha
     updaterState.installedVersion = remoteVersion or updaterState.remoteVersion or localVersion()
     updateAvailable = false
-    setStatus(message or "Update complete. Reload the bot.", "#98BF64")
-    if reloadButton then
-      reloadButton:setEnabled(true)
-    end
-    info("[mBot updater] Update finished. Reload the bot.")
+    setStatus(message or "Update complete. Reloading...", "#98BF64")
+    schedule(400, function()
+      reload()
+    end)
   else
     setStatus(message or "Download failed.", "#d9321f")
     warn("[mBot updater] " .. (message or "Download failed"))
@@ -310,7 +308,7 @@ local function downloadFile(index, retries)
     return
   end
   if index > #fileQueue then
-    finishDownload(true, "Update complete (" .. #fileQueue .. " files). Reload the bot.")
+    finishDownload(true, "Update complete (" .. #fileQueue .. " files). Reloading...")
     return
   end
 
@@ -500,11 +498,6 @@ end
 downloadButton = UI.Button("Download update", function()
   downloadUpdate()
 end)
-
-reloadButton = UI.Button("Reload bot", function()
-  reload()
-end)
-reloadButton:setEnabled(false)
 
 UI.Separator()
 
