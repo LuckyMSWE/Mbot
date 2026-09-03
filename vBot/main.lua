@@ -1,4 +1,4 @@
-local VERSION = "4.19"
+local VERSION = "4.20"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -276,11 +276,18 @@ local function setStatus(text, color, clearAfter)
   end
 end
 
+local function syncDownloadButton()
+  if not downloadButton then
+    return
+  end
+  local show = updateAvailable and not busy
+  downloadButton:setVisible(show)
+  downloadButton:setEnabled(show)
+end
+
 local function setBusy(state)
   busy = state
-  if downloadButton then
-    downloadButton:setEnabled(not state)
-  end
+  syncDownloadButton()
 end
 
 local function markUpdateAvailable(remote, sha)
@@ -297,15 +304,14 @@ local function markUpdateAvailable(remote, sha)
     extra = " [" .. sha:sub(1, 7) .. "]"
   end
   setStatus("New version available: v" .. remoteVersion .. extra, "#e6b800")
-  if downloadButton then
-    downloadButton:setEnabled(true)
-  end
+  syncDownloadButton()
 end
 
 local function markUpToDate(remote, silent)
   remoteVersion = normalizeVersion(remote)
   updateAvailable = false
   updaterState.remoteVersion = remoteVersion
+  syncDownloadButton()
   if silent then
     return
   end
@@ -313,20 +319,21 @@ local function markUpToDate(remote, silent)
 end
 
 local function finishDownload(ok, message)
-  setBusy(false)
   if ok then
     updaterState.installedSha = remoteSha or updaterState.remoteSha
     updaterState.seenSha = updaterState.installedSha
     updaterState.installedVersion = remoteVersion or updaterState.remoteVersion or localVersion()
     updateAvailable = false
+    setBusy(false)
     setStatus(message or "Update complete. Reloading...", "#98BF64")
     schedule(400, function()
       reload()
     end)
-  else
-    setStatus(message or "Download failed.", "#d9321f")
-    warn("[mBot updater] " .. (message or "Download failed"))
+    return
   end
+  setBusy(false)
+  setStatus(message or "Download failed.", "#d9321f")
+  warn("[mBot updater] " .. (message or "Download failed"))
 end
 
 local function downloadFile(index, retries)
@@ -514,6 +521,7 @@ end
 downloadButton = UI.Button("Download update", function()
   downloadUpdate()
 end)
+syncDownloadButton()
 
 UI.Separator()
 
