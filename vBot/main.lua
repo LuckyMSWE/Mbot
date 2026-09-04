@@ -1,4 +1,4 @@
-local VERSION = "4.34"
+local VERSION = "4.35"
 
 setDefaultTab("Main")
 

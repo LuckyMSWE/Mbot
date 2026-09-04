@@ -51,7 +51,7 @@ local function botVersion()
   if MbotUpdater and MbotUpdater.localVersion then
     return MbotUpdater.localVersion()
   end
-  return "4.34"
+  return "4.35"
 end
 
 local function clientName()
@@ -71,7 +71,7 @@ setDefaultTab("Main")
 local ui = setupUI([[
 Panel
   id: mbotLicenseBox
-  height: 86
+  height: 108
 
   Label
     id: title
@@ -94,30 +94,29 @@ Panel
   Button
     id: activate
     anchors.left: parent.left
-    anchors.right: parent.horizontalCenter
+    anchors.right: parent.right
     anchors.top: prev.bottom
     margin-top: 4
-    margin-right: 2
     height: 18
     text: Activate
-
-  Button
-    id: update
-    anchors.left: parent.horizontalCenter
-    anchors.right: parent.right
-    anchors.top: activate.top
-    margin-left: 2
-    height: 18
-    text: Download update
 
   Label
     id: status
     anchors.left: parent.left
     anchors.right: parent.right
-    anchors.top: activate.bottom
+    anchors.top: prev.bottom
     margin-top: 4
     text-align: center
     text: Enter your license key
+
+  Button
+    id: update
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 4
+    height: 18
+    text: Download update
 ]])
 
 local function setStatus(text, color)
