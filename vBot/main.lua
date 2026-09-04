@@ -1,4 +1,4 @@
-local VERSION = "4.33"
+local VERSION = "4.34"
 
 setDefaultTab("Main")
 
@@ -39,14 +39,14 @@ local function setStatus(text, color, clearAfter)
 end
 
 local function syncUpdateButtons()
-  local show = MbotUpdater.isAvailable() and not MbotUpdater.isBusy()
+  local busy = MbotUpdater.isBusy()
   if downloadButton then
-    downloadButton:setVisible(show)
-    downloadButton:setEnabled(show)
+    downloadButton:setVisible(true)
+    downloadButton:setEnabled(not busy)
   end
   if changelogButton then
-    changelogButton:setVisible(show)
-    changelogButton:setEnabled(show)
+    changelogButton:setVisible(true)
+    changelogButton:setEnabled(not busy)
   end
 end
 

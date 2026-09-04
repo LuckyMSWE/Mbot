@@ -14,7 +14,6 @@ local function loadScript(name)
 end
 
 local featureFiles = {
-  "main",
   "items",
   "vlib",
   "new_cavebot_lib",
@@ -60,25 +59,12 @@ function MbotLoadBot()
   end
   featuresLoaded = true
 
-  for _, file in ipairs(featureFiles) do
-    if file == "main" or trusted then
-      if file == "main" then
-        local ok, err = pcall(function()
-          loadScript(file)
-        end)
-        if ok then
-          mainLoaded = true
-        else
-          warn("[mBot] main.lua failed to load: " .. tostring(err))
-        end
-      else
-        loadScript(file)
-      end
-    end
+  if not trusted then
+    return
   end
 
-  if not mainLoaded and MbotUpdater and MbotUpdater.recover then
-    MbotUpdater.recover()
+  for _, file in ipairs(featureFiles) do
+    loadScript(file)
   end
 
   setDefaultTab("Main")
@@ -100,4 +86,17 @@ if not trusted then
 end
 
 loadScript("updater")
+
+local mainOk, mainErr = pcall(function()
+  loadScript("main")
+end)
+if mainOk then
+  mainLoaded = true
+else
+  warn("[mBot] main.lua failed to load: " .. tostring(mainErr))
+end
+if not mainLoaded and MbotUpdater and MbotUpdater.recover then
+  MbotUpdater.recover()
+end
+
 loadScript("license")

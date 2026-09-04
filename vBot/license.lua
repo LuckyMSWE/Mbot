@@ -32,20 +32,6 @@ local session = {
   retry = false
 }
 
-local contents = modules.game_bot.contentsPanel
-local botWindow = contents and contents:getParent() or nil
-local ui
-
-if contents then
-  local children = contents.getChildren and contents:getChildren() or {}
-  for _, child in ipairs(children) do
-    child:setVisible(false)
-  end
-end
-if botWindow and botWindow.setText then
-  botWindow:setText("License Key")
-end
-
 local function trim(value)
   return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
@@ -65,7 +51,7 @@ local function botVersion()
   if MbotUpdater and MbotUpdater.localVersion then
     return MbotUpdater.localVersion()
   end
-  return "4.33"
+  return "4.34"
 end
 
 local function clientName()
@@ -81,58 +67,81 @@ local function clientName()
   return "OTClient"
 end
 
-local function setWindowTitle(text)
-  if botWindow and botWindow.setText then
-    botWindow:setText(text)
-  end
-end
+setDefaultTab("Main")
+local ui = setupUI([[
+Panel
+  id: mbotLicenseBox
+  height: 86
 
-local function setChromeVisible(visible)
-  if not contents then
-    return
-  end
-  local children = contents.getChildren and contents:getChildren() or {}
-  for _, child in ipairs(children) do
-    if child:getId() ~= "mbotLicenseBox" then
-      child:setVisible(visible)
-    end
-  end
-end
+  Label
+    id: title
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: parent.top
+    text-align: center
+    text: License Key
 
-local function setGateVisible(showField, statusText, statusColor)
-  setChromeVisible(false)
-  setWindowTitle("License Key")
-  if ui then
-    ui:setVisible(true)
-    if ui.key then
-      ui.key:setVisible(showField)
-    end
-    if ui.activate then
-      ui.activate:setVisible(showField)
-    end
-    if ui.status then
-      ui.status:setText(statusText or "Enter your license key")
-      ui.status:setColor(statusColor or "#dfdfdf")
-    end
-  end
-end
+  TextEdit
+    id: key
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: prev.bottom
+    margin-top: 4
+    height: 18
+    focusable: true
+    editable: true
 
-local function revealBot()
-  if ui then
-    ui:hide()
-  end
-  setWindowTitle("Bot")
-  if MbotLoadBot then
-    MbotLoadBot()
-  end
-  setChromeVisible(true)
-end
+  Button
+    id: activate
+    anchors.left: parent.left
+    anchors.right: parent.horizontalCenter
+    anchors.top: prev.bottom
+    margin-top: 4
+    margin-right: 2
+    height: 18
+    text: Activate
+
+  Button
+    id: update
+    anchors.left: parent.horizontalCenter
+    anchors.right: parent.right
+    anchors.top: activate.top
+    margin-left: 2
+    height: 18
+    text: Download update
+
+  Label
+    id: status
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: activate.bottom
+    margin-top: 4
+    text-align: center
+    text: Enter your license key
+]])
 
 local function setStatus(text, color)
-  if ui and ui.status and ui:isVisible() then
+  if ui and ui.status then
     ui.status:setText(text)
     ui.status:setColor(color or "#dfdfdf")
   end
+end
+
+local function showGate(message, color)
+  if ui then
+    ui:show()
+    if ui.key then
+      ui.key:show()
+      ui.key:setEditable(true)
+    end
+    if ui.activate then
+      ui.activate:show()
+    end
+    if ui.update then
+      ui.update:show()
+    end
+  end
+  setStatus(message or "Enter your license key", color or "#dfdfdf")
 end
 
 function MbotLicense.ok()
@@ -176,7 +185,7 @@ local function fail(message, canRetry)
   session.busy = false
   session.retry = canRetry == true
   lockAutomation()
-  setGateVisible(true, message or "Enter your license key", "#d9321f")
+  showGate(message or "Enter your license key", "#d9321f")
 end
 
 local function succeed(payload)
@@ -187,7 +196,12 @@ local function succeed(payload)
   session.busy = false
   session.retry = false
   cfg.key = trim(cfg.key)
-  revealBot()
+  if ui then
+    ui:hide()
+  end
+  if MbotLoadBot then
+    MbotLoadBot()
+  end
 end
 
 function MbotLicense.handshake()
@@ -195,7 +209,7 @@ function MbotLicense.handshake()
     return
   end
   cfg.url = normalizeUrl(cfg.url)
-  if ui and ui.key and ui.key:isVisible() then
+  if ui and ui.key then
     cfg.key = trim(ui.key:getText())
   else
     cfg.key = trim(cfg.key)
@@ -206,7 +220,7 @@ function MbotLicense.handshake()
   end
 
   session.busy = true
-  setGateVisible(false, "Checking license...", "#dfdfdf")
+  setStatus("Checking license...", "#dfdfdf")
   local sent, sendErr = pcall(function()
     HTTP.postJSON(cfg.url .. "/api/v1/auth/handshake", {
       license_key = cfg.key,
@@ -250,66 +264,27 @@ function MbotLicense.heartbeat()
   end
 end
 
-if contents then
-  ui = contents:recursiveGetChildById("mbotLicenseBox")
-  if not ui then
-    ui = g_ui.loadUIFromString([[
-Panel
-  id: mbotLicenseBox
-  anchors.top: parent.top
-  anchors.left: parent.left
-  anchors.right: parent.right
-  margin-top: 10
-  margin-left: 8
-  margin-right: 8
-  height: 92
-
-  Label
-    id: title
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: parent.top
-    text-align: center
-    text: License Key
-
-  TextEdit
-    id: key
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 6
-    height: 20
-
-  Button
-    id: activate
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 6
-    height: 20
-    text: Activate
-
-  Label
-    id: status
-    anchors.left: parent.left
-    anchors.right: parent.right
-    anchors.top: prev.bottom
-    margin-top: 6
-    text-align: center
-    text: Enter your license key
-]], contents)
+ui.key:setText(cfg.key)
+ui.key.onTextChange = function(widget, text)
+  cfg.key = text
+end
+ui.activate.onClick = function()
+  MbotLicense.handshake()
+end
+ui.update.onClick = function()
+  if MbotUpdater and MbotUpdater.download then
+    MbotUpdater.download()
   end
 end
 
-if ui then
-  ui.key:setText(cfg.key)
-  ui.key.onTextChange = function(widget, text)
-    cfg.key = text
+schedule(50, function()
+  if ui and ui.key then
+    pcall(function()
+      ui.key:setEditable(true)
+      ui.key:focus()
+    end)
   end
-  ui.activate.onClick = function()
-    MbotLicense.handshake()
-  end
-end
+end)
 
 macro(1000, function()
   if not MbotLicense.ok() then
@@ -328,10 +303,10 @@ macro(RETRY_MS, function()
 end)
 
 if trim(cfg.key) ~= "" then
-  setGateVisible(false, "Checking license...", "#dfdfdf")
+  setStatus("Checking license...", "#dfdfdf")
   schedule(400, function()
     MbotLicense.handshake()
   end)
 else
-  setGateVisible(true, "Enter your license key", "#dfdfdf")
+  showGate("Enter your license key", "#dfdfdf")
 end
