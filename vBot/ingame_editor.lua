@@ -6,7 +6,15 @@ UI.Button("Ingame script editor", function(newText)
       reload()
     end)
   end)
-  
+
+UI.Button("Settings & Scripts", function()
+  if extrasWindow then
+    extrasWindow:show()
+    extrasWindow:raise()
+    extrasWindow:focus()
+  end
+end)
+
   UI.Separator()
   
   for _, scripts in pairs({storage.ingame_hotkeys}) do
