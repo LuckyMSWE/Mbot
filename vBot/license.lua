@@ -52,7 +52,7 @@ local function botVersion()
   if MbotUpdater and MbotUpdater.localVersion then
     return MbotUpdater.localVersion()
   end
-  return "4.37"
+  return "4.38"
 end
 
 local function clientName()
@@ -72,7 +72,7 @@ setDefaultTab("Main")
 local ui = setupUI([[
 Panel
   id: mbotLicenseBox
-  height: 108
+  height: 120
 
   Label
     id: title
@@ -88,7 +88,7 @@ Panel
     anchors.right: parent.right
     anchors.top: prev.bottom
     margin-top: 4
-    height: 18
+    height: 28
     focusable: true
     editable: true
 
@@ -318,10 +318,17 @@ local function openLicenseEditor()
   end
   local window = modules.client_textedit.show(ui.key, {
     title = "License Key",
-    description = "Enter your license key"
+    description = "Enter your license key",
+    width = 460
   })
-  if window and window.text then
-    window.text:setText(trim(cfg.key))
+  if window then
+    window:setWidth(460)
+    pcall(function()
+      window:setHeight(170)
+    end)
+    if window.text then
+      window.text:setText(trim(cfg.key))
+    end
   end
   schedule(50, function()
     if not window then
