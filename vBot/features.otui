@@ -1,0 +1,63 @@
+FeatureCheckBox < Panel
+  height: 20
+  margin-top: 2
+
+  CheckBox
+    id: tick
+    anchors.fill: parent
+    margin-top: 4
+    font: verdana-11px-rounded
+    text: Feature
+    text-offset: 17 -3
+
+FeaturesWindow < MainWindow
+  !text: tr('Features')
+  size: 330 360
+  padding: 15
+  @onEscape: self:hide()
+
+  FlatPanel
+    id: list
+    anchors.fill: parent
+    anchors.bottom: separator.top
+    margin-bottom: 20
+    margin-top: 10
+    layout: verticalBox
+    padding: 10
+    padding-top: 5
+
+  Label
+    anchors.verticalCenter: list.top
+    anchors.left: list.left
+    margin-left: 5
+    width: 200
+    text: Active Features
+    font: verdana-11px-rounded
+    color: #9f5031
+
+  HorizontalSeparator
+    id: separator
+    anchors.right: parent.right
+    anchors.left: parent.left
+    anchors.bottom: closeButton.top
+    margin-bottom: 8
+
+  ResizeBorder
+    id: bottomResizeBorder
+    anchors.fill: separator
+    height: 3
+    minimum: 220
+    maximum: 600
+    margin-left: 3
+    margin-right: 3
+    background: #ffffff88
+
+  Button
+    id: closeButton
+    !text: tr('Close')
+    font: cipsoftFont
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    size: 45 21
+    margin-right: 5
+    @onClick: self:getParent():hide()

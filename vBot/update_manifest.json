@@ -1,11 +1,13 @@
 {
-  "version": "4.29",
+  "version": "4.30",
   "repo": "LuckyMSWE/Mbot",
   "branch": "main",
   "changed": [
-    "vBot/updater.lua",
+    "vBot/features.lua",
+    "vBot/features.otui",
+    "_Loader.lua",
     "vBot/main.lua",
-    "vBot/changelog.otui",
+    "vBot/updater.lua",
     "vBot/cache.lua",
     "vBot/version.txt",
     "vBot/update_manifest.json"
@@ -103,6 +105,19 @@
         "vBot/updater.lua",
         "vBot/main.lua",
         "vBot/changelog.otui",
+        "vBot/cache.lua",
+        "vBot/version.txt",
+        "vBot/update_manifest.json"
+      ]
+    },
+    {
+      "version": "4.30",
+      "files": [
+        "vBot/features.lua",
+        "vBot/features.otui",
+        "_Loader.lua",
+        "vBot/main.lua",
+        "vBot/updater.lua",
         "vBot/cache.lua",
         "vBot/version.txt",
         "vBot/update_manifest.json"

@@ -27,6 +27,7 @@ local luaFiles = {
   "cavebot",
   "playerlist",
   "alarms",
+  "features",
   "Conditions",
   "Equipper",  
   "HealBot",
