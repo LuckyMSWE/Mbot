@@ -1,7 +1,7 @@
 -- Frozen update engine. Load before main.lua. Change only when the updater itself is broken.
 MbotUpdater = MbotUpdater or {}
 
-local VERSION = "4.36"
+local VERSION = "4.37"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"

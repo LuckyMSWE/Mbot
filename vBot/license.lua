@@ -31,6 +31,7 @@ local session = {
   busy = false,
   retry = false
 }
+local botRevealed = false
 
 local function trim(value)
   return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -51,7 +52,7 @@ local function botVersion()
   if MbotUpdater and MbotUpdater.localVersion then
     return MbotUpdater.localVersion()
   end
-  return "4.36"
+  return "4.37"
 end
 
 local function clientName()
@@ -166,16 +167,33 @@ function MbotLicense.ok()
   return session.ok == true
 end
 
+local function isExpired()
+  if type(session.expires) ~= "string" or session.expires == "" then
+    return false
+  end
+  return session.expires <= os.date("!%Y-%m-%d %H:%M:%S")
+end
+
+local function turnOff(mod)
+  if mod and mod.isOn and mod.setOff and mod.isOn() then
+    pcall(function()
+      mod.setOff()
+    end)
+  end
+end
+
 local function lockAutomation()
-  if CaveBot and CaveBot.isOn and CaveBot.isOn() then
-    CaveBot.setOff()
-  end
-  if TargetBot and TargetBot.isOn and TargetBot.isOn() then
-    TargetBot.setOff()
-  end
-  if AttackBot and AttackBot.isOn and AttackBot.isOn() then
-    AttackBot.setOff()
-  end
+  turnOff(CaveBot)
+  turnOff(TargetBot)
+  turnOff(AttackBot)
+  turnOff(HealBot)
+end
+
+local function returnToLicense(message)
+  cfg.lastError = message or "License expired"
+  botRevealed = false
+  lockAutomation()
+  reload()
 end
 
 local function parseApi(data, err)
@@ -195,7 +213,17 @@ local function parseApi(data, err)
   return nil, "Cannot reach license server"
 end
 
+local function isLicenseDead(message)
+  local text = tostring(message or ""):lower()
+  return text:find("expired", 1, true)
+    or text:find("not active", 1, true)
+    or text:find("invalid license", 1, true)
+    or text:find("account disabled", 1, true)
+    or text:find("client blocked", 1, true)
+end
+
 local function fail(message, canRetry)
+  local shouldReset = botRevealed and isLicenseDead(message)
   session.ok = false
   session.token = nil
   session.name = nil
@@ -203,6 +231,10 @@ local function fail(message, canRetry)
   session.busy = false
   session.retry = canRetry == true
   lockAutomation()
+  if shouldReset then
+    returnToLicense(message or "License expired")
+    return
+  end
   showGate(message or "Enter your license key", "#d9321f")
 end
 
@@ -214,9 +246,11 @@ local function succeed(payload)
   session.busy = false
   session.retry = false
   cfg.key = trim(cfg.key)
+  cfg.lastError = nil
   if ui then
     ui:hide()
   end
+  botRevealed = true
   if MbotLoadBot then
     MbotLoadBot()
   end
@@ -328,6 +362,10 @@ ui.update.onClick = function()
 end
 
 macro(1000, function()
+  if session.ok and isExpired() then
+    fail("License expired", false)
+    return
+  end
   if not MbotLicense.ok() then
     lockAutomation()
   end
@@ -343,7 +381,10 @@ macro(RETRY_MS, function()
   end
 end)
 
-if trim(cfg.key) ~= "" then
+if type(cfg.lastError) == "string" and cfg.lastError ~= "" then
+  showGate(cfg.lastError, "#d9321f")
+  cfg.lastError = nil
+elseif trim(cfg.key) ~= "" then
   setStatus("Checking license...", "#dfdfdf")
   schedule(400, function()
     MbotLicense.handshake()
