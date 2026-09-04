@@ -51,7 +51,7 @@ local function botVersion()
   if MbotUpdater and MbotUpdater.localVersion then
     return MbotUpdater.localVersion()
   end
-  return "4.35"
+  return "4.36"
 end
 
 local function clientName()
@@ -126,12 +126,31 @@ local function setStatus(text, color)
   end
 end
 
+local function keyPlaceholder()
+  local value = trim(cfg.key)
+  if value ~= "" then
+    return value
+  end
+  return "Click to enter key"
+end
+
+local function currentKey()
+  local fromField = ""
+  if ui and ui.key then
+    fromField = trim(ui.key:getText())
+  end
+  if fromField ~= "" and fromField ~= "Click to enter key" then
+    return fromField
+  end
+  return trim(cfg.key)
+end
+
 local function showGate(message, color)
   if ui then
     ui:show()
     if ui.key then
       ui.key:show()
-      ui.key:setEditable(true)
+      ui.key:setText(keyPlaceholder())
     end
     if ui.activate then
       ui.activate:show()
@@ -208,11 +227,7 @@ function MbotLicense.handshake()
     return
   end
   cfg.url = normalizeUrl(cfg.url)
-  if ui and ui.key then
-    cfg.key = trim(ui.key:getText())
-  else
-    cfg.key = trim(cfg.key)
-  end
+  cfg.key = currentKey()
   if cfg.key == "" then
     fail("Enter your license key")
     return
@@ -263,9 +278,45 @@ function MbotLicense.heartbeat()
   end
 end
 
-ui.key:setText(cfg.key)
+local function openLicenseEditor()
+  if not modules.client_textedit or not ui or not ui.key then
+    return
+  end
+  local window = modules.client_textedit.show(ui.key, {
+    title = "License Key",
+    description = "Enter your license key"
+  })
+  if window and window.text then
+    window.text:setText(trim(cfg.key))
+  end
+  schedule(50, function()
+    if not window then
+      return
+    end
+    window:raise()
+    window:focus()
+    if window.text then
+      window.text:focus()
+    end
+  end)
+end
+
+ui.key:setText(keyPlaceholder())
+pcall(function()
+  ui.key:setEditable(false)
+end)
 ui.key.onTextChange = function(widget, text)
-  cfg.key = text
+  cfg.key = trim(text)
+  if trim(text) == "" then
+    widget:setText("Click to enter key")
+  end
+end
+ui.key.onClick = openLicenseEditor
+ui.key.onMouseRelease = function(widget, mousePos, mouseButton)
+  if mouseButton == MouseLeftButton then
+    openLicenseEditor()
+    return true
+  end
 end
 ui.activate.onClick = function()
   MbotLicense.handshake()
@@ -275,15 +326,6 @@ ui.update.onClick = function()
     MbotUpdater.download()
   end
 end
-
-schedule(50, function()
-  if ui and ui.key then
-    pcall(function()
-      ui.key:setEditable(true)
-      ui.key:focus()
-    end)
-  end
-end)
 
 macro(1000, function()
   if not MbotLicense.ok() then

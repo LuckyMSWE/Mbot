@@ -1,5 +1,5 @@
 {
-  "version": "4.35",
+  "version": "4.36",
   "repo": "LuckyMSWE/Mbot",
   "branch": "main",
   "changed": [
@@ -172,6 +172,17 @@
     },
     {
       "version": "4.35",
+      "files": [
+        "vBot/license.lua",
+        "vBot/main.lua",
+        "vBot/updater.lua",
+        "vBot/cache.lua",
+        "vBot/version.txt",
+        "vBot/update_manifest.json"
+      ]
+    },
+    {
+      "version": "4.36",
       "files": [
         "vBot/license.lua",
         "vBot/main.lua",
