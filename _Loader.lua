@@ -19,6 +19,7 @@ local luaFiles = {
   "cache",
   "updater", -- bootstrap engine, before everything else
   "main",
+  "license",
   "items",
   "vlib",
   "new_cavebot_lib",

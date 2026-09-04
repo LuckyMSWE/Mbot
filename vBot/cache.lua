@@ -1,7 +1,7 @@
 BotCache = BotCache or {}
 
 local _n = {
-  ["_Loader.lua"] = 379177286,
+  ["_Loader.lua"] = 2087740770,
   ["vBot/alarms.lua"] = 842912808,
   ["vBot/antiRs.lua"] = 2085460167,
   ["vBot/AttackBot.lua"] = 778356226,
@@ -25,7 +25,8 @@ local _n = {
   ["vBot/hold_target.lua"] = 1499664744,
   ["vBot/ingame_editor.lua"] = 649322003,
   ["vBot/items.lua"] = 996223603,
-  ["vBot/main.lua"] = 1056170483,
+  ["vBot/license.lua"] = 3894941,
+  ["vBot/main.lua"] = 1945354226,
   ["vBot/new_cavebot_lib.lua"] = 1087850326,
   ["vBot/new_healer.lua"] = 799846215,
   ["vBot/npc_talk.lua"] = 92164617,
@@ -36,7 +37,7 @@ local _n = {
   ["vBot/spy_level.lua"] = 1271038063,
   ["vBot/supplies.lua"] = 781127483,
   ["vBot/tools.lua"] = 85405674,
-  ["vBot/updater.lua"] = 2107054753,
+  ["vBot/updater.lua"] = 1317912494,
   ["vBot/vlib.lua"] = 2052486552,
   ["vBot/xeno_menu.lua"] = 1375460629,
   ["cavebot/actions.lua"] = 976295248,
