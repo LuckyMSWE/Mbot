@@ -33,14 +33,16 @@ local addCheckBox = function(id, title, defaultValue, dest, tooltip)
     widget:setOn(not widget:isOn())
     settings[id] = widget:isOn()
     if id == "checkPlayer" then
-      local label = rootWidget.newHealer.targetSettings.vocations.title
-      if not widget:isOn() then
-        label:setColor("#d9321f")
-        label:setTooltip("! WARNING ! \nTurn on check players in extras to use this feature!")
-      else
+      pcall(function()
+        local label = rootWidget.newHealer.targetSettings.vocations.title
+        if not widget:isOn() then
+          label:setColor("#d9321f")
+          label:setTooltip("! WARNING ! \nTurn on check players in extras to use this feature!")
+        else
           label:setColor("#dfdfdf")
           label:setTooltip("")
-      end
+        end
+      end)
     end
   end
   widget:setText(title)
@@ -81,9 +83,6 @@ local addScrollBar = function(id, title, min, max, defaultValue, dest, tooltip)
   widget.text:setTooltip(tooltip)
   widget.scroll.onValueChange = function(scroll, value)
     widget.text:setText(title .. ": " .. value)
-    if value == 0 then
-      value = 1
-    end
     settings[id] = value
   end
   widget.scroll:setRange(min, max)
@@ -180,36 +179,34 @@ if true then
   local macheteId = { 2130, 3696 }
   local scytheId = { 3653 }
 
-  setDefaultTab("Tools")
-  -- script
-  if settings.useAll and settings.useAll:len() > 0 then
-    hotkey(settings.useAll, function()
-        if not modules.game_walking.wsadWalking then return end
-        for _, tile in pairs(g_map.getTiles(posz())) do
-            if distanceFromPlayer(tile:getPosition()) < 2 then
-                for _, item in pairs(tile:getItems()) do
-                    -- use
-                    if table.find(useId, item:getId()) then
-                        use(item)
-                        return
-                    elseif table.find(shovelId, item:getId()) then
-                        useWith(settings.shovel, item)
-                        return
-                    elseif table.find(ropeId, item:getId()) then
-                        useWith(settings.rope, item) 
-                        return
-                    elseif table.find(macheteId, item:getId()) then
-                        useWith(settings.machete, item)
-                        return
-                    elseif table.find(scytheId, item:getId()) then
-                        useWith(settings.scythe, item)
-                        return
-                    end
-                end
-            end
+  onKeyDown(function(keys)
+    local hot = settings.useAll
+    if not hot or hot:len() == 0 then return end
+    if keys:lower() ~= hot:lower() then return end
+    if not modules.game_walking.wsadWalking then return end
+    for _, tile in pairs(g_map.getTiles(posz())) do
+      if distanceFromPlayer(tile:getPosition()) < 2 then
+        for _, item in pairs(tile:getItems()) do
+          if table.find(useId, item:getId()) then
+            use(item)
+            return
+          elseif table.find(shovelId, item:getId()) then
+            useWith(settings.shovel, item)
+            return
+          elseif table.find(ropeId, item:getId()) then
+            useWith(settings.rope, item)
+            return
+          elseif table.find(macheteId, item:getId()) then
+            useWith(settings.machete, item)
+            return
+          elseif table.find(scytheId, item:getId()) then
+            useWith(settings.scythe, item)
+            return
+          end
         end
-    end)
-  end
+      end
+    end
+  end)
 end
 
 
@@ -243,7 +240,7 @@ if true then
     if not thing:isItem() then
       return
     end
-    if (thing:getId() == 2129 or thing:getId() == 2130) and tile:getGround() then
+    if (thing:getId() == 2128 or thing:getId() == 2129 or thing:getId() == 2130) and tile:getGround() then
       local pos = tile:getPosition().x .. "," .. tile:getPosition().y .. "," .. tile:getPosition().z
       activeTimers[pos] = nil
       tile:setTimer(0)
@@ -271,22 +268,24 @@ if true then
   macro(500, function()
       if not CaveBot.isOn() or not settings.stake then return end
       for i, tile in ipairs(g_map.getTiles(posz())) do
-        local item = tile:getTopThing()
-        if item and item:isContainer() then
-          if table.find(knifeBodies, item:getId()) and findItem(5908) then
-              CaveBot.delay(550)
-              useWith(5908, item)
-              return
-          end
-          if table.find(stakeBodies, item:getId()) and findItem(5942) then
-              CaveBot.delay(550)
-              useWith(5942, item)
-              return
-          end
-          if table.find(fishingBodies, item:getId()) and findItem(3483) then
-              CaveBot.delay(550)
-              useWith(3483, item)
-              return
+        if distanceFromPlayer(tile:getPosition()) <= 2 then
+          local item = tile:getTopThing()
+          if item and item:isContainer() then
+            if table.find(knifeBodies, item:getId()) and findItem(5908) then
+                CaveBot.delay(550)
+                useWith(5908, item)
+                return
+            end
+            if table.find(stakeBodies, item:getId()) and findItem(5942) then
+                CaveBot.delay(550)
+                useWith(5942, item)
+                return
+            end
+            if table.find(fishingBodies, item:getId()) and findItem(3483) then
+                CaveBot.delay(550)
+                useWith(3483, item)
+                return
+            end
           end
         end
       end
@@ -345,6 +344,9 @@ if true then
     local wsadWalking = modules.game_walking.wsadWalking
     if not settings.autoOpenDoors then return end
     local pos = player:getPosition()
+    local isMove = keys == 'Up' or keys == 'Down' or keys == 'Left' or keys == 'Right'
+      or (wsadWalking and (keys == 'W' or keys == 'S' or keys == 'A' or keys == 'D' or keys == 'Q' or keys == 'E' or keys == 'Z' or keys == 'C'))
+    if not isMove then return end
     if keys == 'Up' or (wsadWalking and keys == 'W') then
       pos.y = pos.y - 1
     elseif keys == 'Down' or (wsadWalking and keys == 'S') then
@@ -383,18 +385,28 @@ if true then
       blessed = true
     end
   end)
-  if settings.bless then
-    if player:getBlessings() == 0 then
+  local function tryBless()
+    if not settings.bless or not player then
+      return
+    end
+    local ok, blessings = pcall(function()
+      return player:getBlessings()
+    end)
+    if ok and blessings == 0 then
       say("!bless")
-      schedule(2000, function() 
-          if g_game.getClientVersion() > 1000 then
-            if not blessed and player:getBlessings() == 0 then
-                warn("!! Blessings not bought !!")
-            end
+      schedule(2000, function()
+        if g_game.getClientVersion() > 1000 then
+          local stillOk, stillBlessings = pcall(function()
+            return player:getBlessings()
+          end)
+          if stillOk and not blessed and stillBlessings == 0 then
+            warn("!! Blessings not bought !!")
           end
+        end
       end)
     end
   end
+  tryBless()
 end
 
 
@@ -405,7 +417,7 @@ if true then
   onUseWith(function(pos, itemId, target, subType)
     if settings.reUse and not table.find(excluded, itemId) then
       schedule(50, function()
-        item = findItem(itemId)
+        local item = findItem(itemId)
         if item then
           modules.game_interface.startUseWith(item)
         end
@@ -421,6 +433,7 @@ if true then
     if not settings.suppliesControl then return end
     if TargetBot.isOff() then return end
     if CaveBot.isOff() then return end
+    if type(hasSupplies) ~= "function" then return end
     if type(hasSupplies()) == 'table' then
         TargetBot.setOff()
     end
@@ -437,6 +450,19 @@ if true then
   local wgHot
 
   local candidates = {}
+
+  local function samePos(a, b)
+    return a and b and a.x == b.x and a.y == b.y and a.z == b.z
+  end
+
+  local function findCandidate(pos)
+    for i, existing in ipairs(candidates) do
+      if samePos(existing, pos) then
+        return i
+      end
+    end
+  end
+
   local m = macro(20, function()
     mwHot = settings.holdMwHot
     wgHot = settings.holdWgHot
@@ -444,19 +470,22 @@ if true then
     if not settings.holdMwall then return end
       if #candidates == 0 then return end
 
-      for i, pos in pairs(candidates) do
+      for i = #candidates, 1, -1 do
+        local pos = candidates[i]
         local tile = g_map.getTile(pos)
         if tile then
-          if tile:getText():len() == 0 then 
+          if tile:getText():len() == 0 then
             table.remove(candidates, i)
-          end
-          local rune = 3180 
-          if tile:getText() == "HOLD WG" then
-            rune = 3156
-          end
-          if tile:canShoot() and not isInPz() and tile:isWalkable() and tile:getTopUseThing():getId() ~= 2130 then
-            if math.abs(player:getPosition().x-tile:getPosition().x) < 8 and math.abs(player:getPosition().y-tile:getPosition().y) < 6 then
-              return useWith(rune, tile:getTopUseThing())
+          else
+            local rune = 3180
+            if tile:getText() == "HOLD WG" then
+              rune = 3156
+            end
+            local top = tile:getTopUseThing()
+            if top and tile:canShoot() and not isInPz() and tile:isWalkable() and top:getId() ~= 2130 then
+              if math.abs(player:getPosition().x-tile:getPosition().x) < 8 and math.abs(player:getPosition().y-tile:getPosition().y) < 6 then
+                return useWith(rune, top)
+              end
             end
           end
         end
@@ -469,8 +498,9 @@ if true then
       if tile:getText():find("HOLD") then
           table.insert(candidates, tile:getPosition())
           local rune = tile:getText() == "HOLD MW" and 3180 or tile:getText() == "HOLD WG" and 3156
-          if math.abs(player:getPosition().x-tile:getPosition().x) < 8 and math.abs(player:getPosition().y-tile:getPosition().y) < 6 then
-            return useWith(rune, tile:getTopUseThing())
+          local top = tile:getTopUseThing()
+          if rune and top and math.abs(player:getPosition().x-tile:getPosition().x) < 8 and math.abs(player:getPosition().y-tile:getPosition().y) < 6 then
+            return useWith(rune, top)
           end
       end
   end)
@@ -480,7 +510,10 @@ if true then
       if m.isOff() then return end
       if thing:getId() ~= 2129 then return end
       if tile:getText():len() > 0 then
-          table.remove(candidates, table.find(candidates,tile))
+          local index = findCandidate(tile:getPosition())
+          if index then
+            table.remove(candidates, index)
+          end
       end
   end)
 
@@ -534,6 +567,7 @@ if true then
       if spec:isPlayer() and spec:getText() == "" and spec:getPosition().z == posz() and spec ~= player then
           g_game.look(spec)
           found = now
+          return
       end
     end
   end
@@ -597,15 +631,19 @@ addCheckBox("nextBackpack", "Open Next Loot Container", true, leftPanel, "Auto o
   local function openNextLootContainer()
     if not settings.nextBackpack then return end
     local containers = getContainers()
+    if type(CaveBot.GetLootContainers) ~= "function" then return end
     local lootCotaniersIds = CaveBot.GetLootContainers()
 
     for i, container in ipairs(containers) do
-      local cId = container:getContainerItem():getId()
-      if containerIsFull(container) then
-        if table.find(lootCotaniersIds, cId) then
-          for _, item in ipairs(container:getItems()) do
-            if item:getId() == cId then
-              return g_game.open(item, container)
+      local containerItem = container:getContainerItem()
+      if containerItem then
+        local cId = containerItem:getId()
+        if containerIsFull(container) then
+          if table.find(lootCotaniersIds, cId) then
+            for _, item in ipairs(container:getItems()) do
+              if item:getId() == cId then
+                return g_game.open(item, container)
+              end
             end
           end
         end
@@ -629,6 +667,7 @@ end
 addCheckBox("highlightTarget", "Highlight Current Target", true, rightPanel, "Additionaly hightlight current target with red glow")
 if true then
   local function forceMarked(creature)
+    if not settings.highlightTarget then return end
     if target() == creature then
         creature:setMarked("red")
         return schedule(333, function() forceMarked(creature) end)

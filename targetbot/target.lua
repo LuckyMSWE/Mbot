@@ -57,7 +57,7 @@ targetbotMacro = macro(100, function()
   for i, creature in ipairs(creatures) do
     local hppc = creature:getHealthPercent()
     if hppc and hppc > 0 then
-      local path = findPath(player:getPosition(), creature:getPosition(), 7, {ignoreLastCreature=true, ignoreNonPathable=true, ignoreCost=true, ignoreCreatures=true})
+      local path = findPath(player:getPosition(), creature:getPosition(), 7, {ignoreLastCreature=true, ignoreNonPathable=not storage.extras.reachable, ignoreCost=true, ignoreCreatures=true})
       if creature:isMonster() and (oldTibia or creature:getType() < 3) and path then
         local params = TargetBot.Creature.calculateParams(creature, path) -- return {craeture, config, danger, priority}
         dangerLevel = dangerLevel + params.danger
