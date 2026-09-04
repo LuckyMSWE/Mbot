@@ -1,7 +1,7 @@
 -- Frozen update engine. Load before main.lua. Change only when the updater itself is broken.
 MbotUpdater = MbotUpdater or {}
 
-local VERSION = "4.28"
+local VERSION = "4.29"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -633,6 +633,83 @@ end
 
 local changelogCache = nil
 
+local CHANGELOG_TYPES = {
+  feat = "Feat",
+  feature = "Feat",
+  fix = "Fix",
+  improve = "Improve",
+  refactor = "Refactor",
+  docs = "Docs",
+  test = "Test",
+  chore = "Chore",
+  update = "Update"
+}
+
+local function prettyType(raw)
+  if type(raw) ~= "string" then
+    return "Update"
+  end
+  raw = raw:lower():gsub("%s+", "")
+  if CHANGELOG_TYPES[raw] then
+    return CHANGELOG_TYPES[raw]
+  end
+  if raw:len() == 0 then
+    return "Update"
+  end
+  return raw:sub(1, 1):upper() .. raw:sub(2)
+end
+
+local function cutMeta(text)
+  if type(text) ~= "string" then
+    return ""
+  end
+  text = text:match("^(.-)\n[Bb]reaking [Cc]hanges") or text
+  text = text:match("^(.-)\n## ") or text
+  text = text:match("^(.-)\n[Vv]erification") or text
+  text = text:match("^(.-)\n[Cc]ommit%s*\n") or text
+  text = text:match("^(.-)\nCo%-authored%-by:") or text
+  text = text:gsub("\n[Ss]igned%-off%-by:.*", "")
+  return text:gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+local function parseCommit(message)
+  message = message:gsub("\r\n", "\n"):gsub("\r", "\n"):gsub("%s+$", "")
+  if message:len() == 0 or message:match("^Merge ") then
+    return nil
+  end
+
+  local fieldType = message:match("[Tt]ype:%s*([^\n]+)")
+  local fieldTitle = message:match("[Tt]itle:%s*([^\n]+)")
+  local fieldDesc = message:match("[Dd]escription:%s*\n?(.*)")
+  if fieldType and fieldTitle then
+    return prettyType(fieldType), fieldTitle:gsub("%s+$", ""), cutMeta(fieldDesc or "")
+  end
+
+  local first, rest = message:match("([^\n]+)\n*(.*)")
+  if not first then
+    return nil
+  end
+  first = first:gsub("^%s+", ""):gsub("%s+$", "")
+  local typed, titled = first:match("^(%w+)%s*:%s*(.+)$")
+  if typed and CHANGELOG_TYPES[typed:lower()] then
+    return prettyType(typed), titled:gsub("%s+$", ""), cutMeta(rest)
+  end
+  return "Update", first, cutMeta(rest)
+end
+
+local function formatEntry(kind, title, description)
+  local lines = {
+    "Type:  " .. kind,
+    "Title: " .. title
+  }
+  if description and description:len() > 0 then
+    table.insert(lines, "")
+    table.insert(lines, "Description:")
+    table.insert(lines, description)
+  end
+  return table.concat(lines, "\n")
+end
+
 local function formatCommitMessages(parsed)
   if type(parsed) ~= "table" or type(parsed[1]) ~= "table" then
     return nil
@@ -642,16 +719,16 @@ local function formatCommitMessages(parsed)
     local commit = entry.commit
     local message = commit and commit.message
     if type(message) == "string" then
-      message = message:gsub("\r\n", "\n"):gsub("\r", "\n"):gsub("%s+$", "")
-      if message:len() > 0 and not message:match("^Merge ") then
-        table.insert(blocks, message)
+      local kind, title, description = parseCommit(message)
+      if kind and title then
+        table.insert(blocks, formatEntry(kind, title, description))
       end
     end
   end
   if #blocks == 0 then
     return nil
   end
-  return table.concat(blocks, "\n\n")
+  return table.concat(blocks, "\n\n------------------------------\n\n")
 end
 
 function MbotUpdater.fetchChangelog(callback)

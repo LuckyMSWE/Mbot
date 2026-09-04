@@ -1,6 +1,6 @@
 MbotChangelogWindow < MainWindow
   !text: tr('Changelog')
-  size: 400 320
+  size: 420 340
   @onEscape: self:hide()
 
   TextEdit
