@@ -1,4 +1,4 @@
-local VERSION = "4.25"
+local VERSION = "4.26"
 
 setDefaultTab("Main")
 
@@ -18,6 +18,7 @@ end
 local statusLabel = UI.Label("Updater: ready")
 statusLabel:setColor("#dfdfdf")
 local downloadButton
+local changelogButton
 local statusToken = 0
 
 local function setStatus(text, color, clearAfter)
@@ -37,24 +38,52 @@ local function setStatus(text, color, clearAfter)
   end
 end
 
-local function syncDownloadButton()
-  if not downloadButton then
-    return
-  end
+local function syncUpdateButtons()
   local show = MbotUpdater.isAvailable() and not MbotUpdater.isBusy()
-  downloadButton:setVisible(show)
-  downloadButton:setEnabled(show)
+  if downloadButton then
+    downloadButton:setVisible(show)
+    downloadButton:setEnabled(show)
+  end
+  if changelogButton then
+    changelogButton:setVisible(show)
+    changelogButton:setEnabled(show)
+  end
+end
+
+local changelogWindow = UI.createWindow("MbotChangelogWindow")
+changelogWindow:hide()
+changelogWindow.closeButton.onClick = function()
+  changelogWindow:hide()
+end
+
+local function openChangelog()
+  changelogWindow.log:setText("Loading...")
+  changelogWindow:show()
+  changelogWindow:raise()
+  changelogWindow:focus()
+  MbotUpdater.fetchChangelog(function(text)
+    if text and text:len() > 0 then
+      changelogWindow.log:setText(text)
+    else
+      changelogWindow.log:setText("Could not load changelog from GitHub.")
+    end
+  end)
 end
 
 MbotUpdater.init({
   onStatus = setStatus,
-  onState = syncDownloadButton
+  onState = syncUpdateButtons
 })
 
 downloadButton = UI.Button("Download update", function()
   MbotUpdater.download()
 end)
-syncDownloadButton()
+
+changelogButton = UI.Button("Changelog", function()
+  openChangelog()
+end)
+
+syncUpdateButtons()
 
 UI.Separator()
 

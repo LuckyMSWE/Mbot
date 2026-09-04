@@ -1,7 +1,7 @@
 -- Frozen update engine. Load before main.lua. Change only when the updater itself is broken.
 MbotUpdater = MbotUpdater or {}
 
-local VERSION = "4.25"
+local VERSION = "4.26"
 local REPO = "LuckyMSWE/Mbot"
 local BRANCH = "main"
 local RAW_BASE = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"
@@ -629,4 +629,45 @@ end
 function MbotUpdater.recover()
   autoRecover = true
   MbotUpdater.start()
+end
+
+local changelogCache = nil
+
+local function formatCommitMessages(parsed)
+  if type(parsed) ~= "table" or type(parsed[1]) ~= "table" then
+    return nil
+  end
+  local blocks = {}
+  for _, entry in ipairs(parsed) do
+    local commit = entry.commit
+    local message = commit and commit.message
+    if type(message) == "string" then
+      message = message:gsub("\r\n", "\n"):gsub("\r", "\n"):gsub("%s+$", "")
+      if message:len() > 0 and not message:match("^Merge ") then
+        table.insert(blocks, message)
+      end
+    end
+  end
+  if #blocks == 0 then
+    return nil
+  end
+  return table.concat(blocks, "\n\n")
+end
+
+function MbotUpdater.fetchChangelog(callback)
+  if type(callback) ~= "function" then
+    return
+  end
+  if changelogCache then
+    callback(changelogCache)
+    return
+  end
+  local url = "https://api.github.com/repos/" .. REPO .. "/commits?sha=" .. BRANCH .. "&per_page=20"
+  httpGet(url, CHECK_RETRIES, function(data)
+    local text = formatCommitMessages(decodeJson(data))
+    if text then
+      changelogCache = text
+    end
+    callback(text)
+  end)
 end

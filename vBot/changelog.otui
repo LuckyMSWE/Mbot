@@ -1,0 +1,24 @@
+MbotChangelogWindow < MainWindow
+  !text: tr('Changelog')
+  size: 400 320
+  @onEscape: self:hide()
+
+  TextEdit
+    id: log
+    anchors.top: parent.top
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeButton.top
+    margin-bottom: 10
+    multiline: true
+    text-wrap: true
+    text-align: top-left
+
+  Button
+    id: closeButton
+    !text: tr('Close')
+    font: cipsoftFont
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    size: 60 21
+    @onClick: self:getParent():hide()
